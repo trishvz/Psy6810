@@ -1,0 +1,2059 @@
+---
+title: "Module 3 - ANOVA"
+author: "TVZ"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 3
+  word_document:
+    toc: true
+    toc_depth: '3'
+  html_document:
+    df_print: paged
+    toc: true
+    toc_depth: 3
+urlcolor: blue
+editor_options:
+  markdown:
+    wrap: 80
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r results='hide'}
+# Upload the libraries used in this document
+#library("ggplot2")
+#library("tinytex")
+#library("extraDistr")
+#library("sysid")
+library("DescTools")
+library('effectsize')
+# library('PairedData')
+library('pwrss')
+library('pwr')
+#library("psych")
+#library('multcomp')
+```
+
+This notebook is extra! Do what you can, if you can. Do what you find
+interesting. It should be useful for you as a reference while you work on your
+own analysis problems, most of which will involve some kind of ANOVA or
+regression.
+
+# Learning Objectives
+
+Analysis of Variance (ANOVA) is a statistical method used to compare means
+across two or more groups to determine if there are any significant differences
+between those groups. We will first discuss the ANOVA model, then the process of
+*partitioning the variance*, which is the theoretical foundation for the ANOVA
+procedure. Following that, we will fit an ANOVA model and determine if a
+treatment has significant effects and perform diagnostics to determine if the
+assumptions of the ANOVA model are satisfied. Then we discuss the concepts of
+power and effect size, and how these concepts vary from the same concepts
+encountered in $z$- and $t$-tests. We will talk about post-hoc and planned
+contrasts, and end with the analysis of factorial and repeated measures designs.
+
+At the end of this notebook you should be able to:
+
+1.  Identify scenarios in which Analysis of Variance (ANOVA) is the appropriate
+    statistical tool for comparing means across multiple groups.
+2.  Identify the key assumptions of ANOVA (normality, homogeneity of variances,
+    independence of observations) and explain the consequences of violating
+    them.
+3.  Compute the F-statistic and explain how its magnitude relates to the
+    rejection of the null hypothesis of equality of means.
+4.  Distinguish clearly between the application and interpretation of One-Way
+    and Two-Way ANOVA.
+5.  Define a statistical interaction effect in the context of Two-Way ANOVA and
+    explain why a significant interaction dictates the primary focus of
+    interpretation.
+6.  Structure a dataset appropriately in `R` and use built-in `R` functions (or
+    common packages like `aov` or `lm`) to execute both One-Way and Two-Way
+    ANOVA.
+7.  Generate and interpret necessary diagnostic plots (e.g., Q-Q plots,
+    residuals vs. fitted plots) to formally check the assumptions of the ANOVA
+    model.
+8.  Summarize and report the key results of the ANOVA, including degrees of
+    freedom, F-statistic, and p-value, in an academic or report-ready format.
+9.  Explain the difference between planned (a priori) contrasts and post-hoc
+    tests, and justify when to use each approach based on the research question.
+10. Apply a common post-hoc procedure (such as Tukey's HSD) using an appropriate
+    `R` package and interpret the resulting pairwise comparisons.
+11. Formulate specific hypotheses and assign appropriate contrast coefficients
+    to test targeted comparisons between means (e.g., simple, repeated, or
+    polynomial contrasts).
+12. Recognize the problem of inflated Type I error due to multiple comparisons
+    and explain the rationale behind common correction methods (e.g.,
+    Bonferroni, Holm).
+13. Identify main effects and interactions from a plot of condition means.
+14. Perform a factorial ANOVA for data from experimental designs with more than
+    1 categorical predictor variables.
+15. Perform a repeated measures ANOVA for data from experimental designs with a
+    single repeated categorical predictor variable.
+
+# Upload GSS Data
+
+```{r}
+data <- read.csv("GSS_1980.csv",header=TRUE)
+data$X <- NULL
+```
+
+# Introduction to ANOVA
+
+The hypothesis tests that we have considered up to this point have been focused
+on only one or two means, with the goal of arguing against the hypothesis that
+either one mean comes from a sample from a population with a stated null mean
+$\mu_0$ or that the difference between two means is due to sampling variability
+(chance: $\mu_1 = \mu_2$). But what about the situation where we have two or
+more means?
+
+ANOVA examines how a (numeric) dependent variable changes across levels of one
+or more *categorical* independent variables. For example, consider the GSS_1980
+dataset. Let's look at respondents' income as a function of their reported
+health.
+
+```{r}
+# Pull out variables of interest
+money <- data$REALRINC
+siblings <- data$SIBS
+age <- data$AGE
+happy <- data$HAPPY
+
+# Make sure the health and happiness ratings are categorical (super important)
+health <- as.factor(data$HEALTH)
+happy <- as.factor(data$HAPPY)
+
+# Redefine the data object
+data <- data.frame("money" = money,"health"= health,"age"=age,"siblings"=siblings,"happy"=happy)
+```
+
+Let's focus on respondents' age as a function of reported health, under the
+assumption that people who report poor health (health=4) will tend to be older
+than those who report good health (health \< 4).
+
+```{r}
+# Plot age as a function of health
+plot(health,age)
+```
+
+This *box and whisker* chart tends to confirm our suspicions about the
+relationship between age and reported health. But we would like to say that the
+differences in the means across levels of reported health are *significantly*
+different. To do this we will perform an analysis of variance (ANOVA).
+
+The ANOVA null hypothesis is $$
+H_0: \mu_1 = \mu_2 = \cdots = \mu_J
+$$ for $J$ groups or $J$ *levels* of an independent variable. This hypothesis is
+called the *omnibus null*: we're going to design a test for equality of all the
+groups in our experiment. The alternative to this hypothesis is $$
+H_1: \text{ At least one } \mu_j \text{ is different from the others}.
+$$
+
+When we reject $H_0$ we will not know why we rejected it: ANOVA alone will not
+tell us much about what's going on in each group. We'll need to do other things
+to figure that out (we'll discuss these things later).
+
+### 1. Your turn!
+
+Using your own dataset, select the dependent variable and a categorical
+independent variable with at least 3 levels. Create a box-and-whisker plot of
+the dependent variable as a function of the independent variable. State your
+null and alternative hypotheses for an ANOVA test of equality of means across
+the levels of your independent variable.
+
+```{r}
+# Insert your code here
+```
+
+## Can't We Just Do $t$-Tests?
+
+Your immediate instinct (coming off of several weeks of doing nothing but
+$t$-tests) might be that the way to test $$
+H_0: \mu_1 = \mu_2 = \cdots = \mu_J
+$$ is to contrast all pairs of means across the $J$ groups by doing
+$\binom{J}{2} = J(J-1)/2$ independent samples $t$-tests. While this might not be
+a bad idea, it has one serious shortcoming. What is the probability of making at
+least one Type I error across all of those pairwise tests? That is, if we want
+our probability of erroneously rejecting $H_0: \mu_i = \mu_j$ for one or more
+pairs of means not to exceed $\alpha$, will the pairwise $t$-test strategy be
+the best approach?
+
+Assume that $J=4$. Then $\binom{4}{2} = \dfrac{4 \cdot 3}{2} = 6$. For each of
+those 6 tests we'll set $\alpha = 0.05$. The probability of *not* making a Type
+I error on any one test is $1 - \alpha = 0.95$. Under the assumption of
+independence across the groups (which we need for the independent samples
+$t$-test *and* the ANOVA), the probability of not making a single Type I error
+across the 6 tests is $(1 - \alpha)^6$. Conversely, the probability of making
+one or more Type I errors is $1 - (1 - \alpha)^6$.
+
+Because $1 - \alpha$ is less than 1, raising it to higher and higher powers
+results in a smaller and smaller probability of not making an error. In turn,
+the probability of making an error must therefore increase for all values of
+$\alpha < 1$.
+
+```{r}
+M <- 1:100 # number of tests
+alpha = 0.05
+
+# Probability of at least one error
+prob.1 <- 1 - (1 - alpha)^M
+
+plot(M,prob.1,type='p',xlab="Number of Tests",ylab="Probability of at Least One Error",cex=.25)
+abline(h=c(0.05,1.0),col='purple4',lty=2)
+```
+
+This graph shows the probability of making at least one Type I error when
+$\alpha=0.05$ as a function of the number of pairwise tests to be performed.
+This probability grows quickly with the number of tests to be performed. By the
+time the number of tests reaches 14 the probability is greater than half. By the
+time it reaches 59 the probability is greater than 95%. Fourteen tests
+corresponds to around $J=6$ groups; 59 tests corresponds to $J=12$ groups (more
+than you should be considering in a single experimental design). Bottom line:
+pairwise $t$-testing is not a good solution for testing equality of more than
+two means.
+
+This $t$-test strategy (pairwise $t$-testing) is something we will encounter
+later in the form of post-hoc testing. Here, however, we will consider an
+alternative strategy (ANOVA) that "rewrites" the null hypothesis $H_0$ as a
+question about variances rather than means. Remember that the F-distribution
+describes the random variable that arises from a ratio of two variances and that
+the F-test is used to examine the hypothesis $H_0: \sigma^2_1 = \sigma^2_2$, or
+equivalently $H_0: \sigma^2_1/\sigma^2_2 = 1$.
+
+## The Logic of ANOVA
+
+Consider the distribution of age measurements across the four health levels.
+
+```{r Anova logic}
+# Plot age as a function of reported health
+plot(age~as.numeric(health),xlab="Reported Health",ylab="Age",cex=.5)
+
+# Add the means of each group to the plot
+means <- aggregate(age,by=list(health),mean)
+points(means$Group.1,means$x,pch='x',col='blue',cex=1.5)
+lines(means$Group.1,means$x,col='blue')
+```
+
+We are interested in whether the mean ages at each level of reported health are
+different. The blue Xs mark the group means that are the focus of our attention.
+Remember that (almost) every statistical procedure is based on a *model*, an
+assumption about how the data were generated. (Some models are more interesting
+than others.) You need to understand the ANOVA model before we proceed.
+
+# The ANOVA Model
+
+Write $X_{ij}$ to indicate the age of respondent $i$ in group $j$. The ANOVA
+model states that every observation $X_{ij}$ within group $j$ should be
+approximately equal to the mean $\mu_j$ of the population from which that group
+was sampled, plus some amount of noise $e_{ij}$. So $X_{ij} = \mu_j + e_{ij}$,
+where $e_{ij} \sim \mathcal{N}(0,\sigma^2_e)$. We assume that the $e_{ij}$s are
+independent and identically distributed with common variance $\sigma^2_e$. This
+means the $X_{ij}$s must also be independent and normally distributed with mean
+$\mu_j$ and variance $\sigma^2_e$. We call $\sigma^2_e$ the error variance: the
+only reason that $X_{ij}$ doesn't exactly equal $\mu_j$ is because of sampling
+error. An important thing to recognize is that error is inexplicable. We don't
+know where it comes from, only that it makes things messy.
+
+Notice the homoskedasticity assumption: the error variance $\sigma^2_e$ is the
+same for each group. If the null hypothesis
+$H_0: \mu_1 = \mu_2 = \cdots = \mu_J$ is true and all the means are the same,
+and if the samples all come from populations with variance $\sigma^2_e$, then
+the samples have all been drawn from the same normal distribution with mean
+$\mu = \mu_j,~j=1,\ldots,J$, called the *grand mean*, and variance $\sigma^2_e$.
+
+For reasons that will become clear later, we can rewrite the model by adding
+zero as $$
+X_{ij} = \mu + (\mu_j - \mu) + e_{ij} = \mu + \tau_j + e_{ij},
+$$ where $\tau_j = \mu_j - \mu$ is called the *effect* of being in group $j$
+(sometimes called the effect of treatment level $j$). If $H_0$ is true, all the
+effects are zero, because $\mu=\mu_j$ for all $j$.
+
+These are the most important assumptions about the ANOVA model:
+
+1.  All groups are independent.
+2.  Individuals are randomly assigned to treatment conditions.
+3.  The measurements $X_{ij}$ are normally distributed.
+4.  The error variance $\sigma^2_e$ is the same over all groups
+    (homoskedasticity).
+
+The ANOVA model predicts that each individual's measurement should be equal to
+the population mean for the group to which the individual was assigned. We don't
+know what $\mu_j$ is so we will estimate it with the group mean
+$\overline{X}_j$. This means that the predicted measurement for each individual
+in group $j$ is $\overline{X}_j$.
+
+Go back to the figure in the code chunk `ANOVA logic`. The ANOVA model allows us
+to reformulate the null hypothesis of equality of means in terms of predicted
+and error variance. If $H_0$ is true, the predicted variance, the variance of
+all the predicted scores, should be approximately the same as the error or
+unexplained variance. To see how this is true, we need to *partition* the total
+variance in the measured variable.
+
+## Partitioning Variance
+
+Consider the age variable in the GSS dataset. To begin, we will look at the
+variance of age without reference to the reported health of any of the
+respondents. This is the *total variance*:
+
+```{r}
+# Total variance of age
+var(data$age)
+```
+
+Remember that the variance of a set of measurements is the sum of squared
+deviations of the measurements from the group mean divided by the degrees of
+freedom, or $$
+s^2 = \dfrac{\sum_{i=1}^N (X_i - \overline{X})^2}{N-1}.
+$$
+
+For the rest of this discussion we will focus on the sum of squares
+$SSX = \sum_{i=1}^N (X_i - \overline{X})^2$, the numerator of the variance of
+$X$. When we look at the sum of squares of a variable over all observations of
+that variable without regard to the experimental design or who is assigned to
+which group we call it the *total* sum of squares. Call $N_{\text{Total}}$ the
+total number of respondents and $SS_{\text{Total}}$ the total sum of squares.
+
+```{r}
+N.Total <- length(age) # all the ages
+SS.Total <- var(age)*(N.Total - 1) # the numerator of the total variance
+```
+
+Now we need to modify our notation a bit to take into account the fact that
+associated with each respondent's age there is also a reported health. Use the
+subscript index $i$ to indicate a particular respondent and a second subscript
+index $j$ to refer to the health "group" they are in, so the age of respondent
+$i$ with reported health $j$ is $X_{ij}$. Each group $j=1,2,\ldots,J$ has $N_j$
+respondents in it, and the number of groups is $J$ (which equals 4 in this case,
+but we'll just write $J$ to keep things as general as possible). So the
+respondents in group $j$ are $i = 1, 2, \ldots, N_j$.
+
+Within each group $j$ we can compute the group mean $\overline{X}_j$ and group
+variance $s^2_j$ in the usual way: $$
+\overline{X}_j = \dfrac{\sum_{i=1}^{N_j} X_{ij}}{N_j},
+$$ and $$
+s^2_j = \dfrac{\sum_{i=1}^{N_j} (X_{ij} - \overline{X}_j)^2}{N_j - 1}.
+$$
+
+```{r}
+# Compute the group statistics and store them in vectors
+group.means <- aggregate(age,by=list(health),mean)
+group.vars <- aggregate(age,by=list(health),var)
+
+# Examine the group characteristics
+Desc(age~health)
+```
+
+(The `Desc()` function from the `DescTools` package provides a nice summary of
+the group statistics, including the group means and variances, the group sizes,
+a box-and-whisker plot of age as a function of health, and a plot of the group
+means. It also gives the results of a Kruskal-Wallis test, which is a
+nonparametric alternative to ANOVA. You don't know yet what a Kruskal-Wallis
+test is, but you can probably guess from the $p$-value it returns that there are
+significant differences among the group means.)
+
+We need to also compute the "grand mean" $\overline{\overline{X}}$, the mean of
+all the ages across all the groups. If all the group sizes $N_j$ are equal we
+can express the grand mean as the mean of the means, or $$
+\overline{\overline{X}} = \dfrac{\sum_{j=1}^J \overline{X_j}}{k}.
+$$ However, if the group sizes are not equal then we have to weight each group
+mean by the group size. To do this you can work backward from the group means
+using the formula for a [weighted
+mean](https://en.wikipedia.org/wiki/Weighted_arithmetic_mean) or just compute
+the mean over all the individual observations. Our notation for this requires an
+additional summation sign: $$
+\overline{\overline{X}} = \dfrac{\sum_{j=1}^J \sum_{i=1}^{N_j} X_{ij}}{N_{\text{Total}}}.
+$$ It shouldn't be hard to figure out this notational twist: set $j=1$ for the
+first group and add up all the values in the group ($X_{i,1}$). Then increment
+$j=2$ and add up all the values in the second group and add that to the sum of
+the first group. Continue incrementing $j$ until you've added up all the values
+of the variable.
+
+```{r}
+# Grand mean when groups are equal or unequal
+grand.mean <- mean(age)
+```
+
+Now rewrite the total sums of squares $SS_{\text{Total}}$ using this new
+notation by adding up the squared deviations within the first group, then the
+second, and so on. Then $SS_{\text{Total}}$ becomes $$
+SS_{\text{Total}} = \sum_{j=1}^J \sum_{i=1}^{N_j} (X_{ij} - \overline{\overline{X}})^2.
+$$
+
+Let's go back to the figure and focus in on one respondent's measurement in
+particular, which I've colored in orange. I've also added the grand mean to the
+plot (the horizontal dashed line).
+
+```{r}
+# Plot age as a function of reported health
+plot(age~as.numeric(health),xlab="Reported Health",ylab="Age",cex=.5)
+
+# Add the means of each group to the plot
+points(group.means$Group.1,group.means$x,pch='x',col='blue',cex=1.5)
+lines(group.means$Group.1,group.means$x,col='blue')
+abline(h=mean(age),lty=2,lwd=2) # grand mean
+
+# Highlight observation 619
+unsub <- 619
+points(health[unsub],age[unsub],pch=19,col='orange',cex=1)
+```
+
+ANOVA decomposes total variance into: 1. **Between-group variance** (explained
+by group differences) 2. **Within-group variance** (residual or error)
+
+The total deviation of respondent 619's age $X_{619,4}$ from the grand mean
+$\overline{\overline{X}}$ can be broken down into two components: the difference
+between Group 4's mean $\overline{X}_4$ from the grand mean
+$\overline{\overline{X}}$ -- the difference between the blue X and the
+horizontal dashed line, between-group deviation -- and the difference between
+the individual's age $X_{619,4}$ from the group mean $\overline{X}_4$ -- the
+difference between the orange dot and the blue X, within-group deviation.
+Mathematically, this is expressed as $$
+X_{ij} - \overline{\overline{X}} = (\overline{X}_j - \overline{\overline{X}}) + (X_{ij} - \overline{X}_j).$$
+
+Squaring both sides and summing over all respondents and all groups gives
+\begin{eqnarray*}
+\sum_{j=1}^J \sum_{i=1}^{N_j} (X_{ij} - \overline{\overline{X}})^2 & = & \sum_{j=1}^J \sum_{i=1}^{N_j} (\overline{X}_j - \overline{\overline{X}})^2 + \sum_{j=1}^J \sum_{i=1}^{N_j} 2 (\overline{X}_j - \overline{\overline{X}})(X_{ij} - \overline{X}_j) + \sum_{j=1}^J \sum_{i=1}^{N_j} (X_{ij} - \overline{X}_j)^2 \\
+& = & \sum_{j=1}^J \sum_{i=1}^{N_j} (\overline{X}_j - \overline{\overline{X}})^2 + 2 \sum_{j=1}^J (\overline{X}_j - \overline{\overline{X}}) \sum_{i=1}^{N_j} (X_{ij} - \overline{X}_j) + \sum_{j=1}^J \sum_{i=1}^{N_j} (X_{ij} - \overline{X}_j)^2 \\
+& = & \sum_{j=1}^J \sum_{i=1}^{N_j} (\overline{X}_j - \overline{\overline{X}})^2 + \sum_{j=1}^J \sum_{i=1}^{N_j} (X_{ij} - \overline{X}_j)^2.
+\end{eqnarray*}
+
+The term in the middle that is multiplied by 2 that we get after expanding the
+product on the right side is zero because the sum of deviations from the group
+mean $\sum_{i=1}^{N_j} \left( X_{ij} - \overline{X}_j \right)$ is always zero.
+
+The left side is the total sum of squares $SS_{\text{Total}}$. The first term on
+the right side is called the *between-groups* sum of squares
+$SS_{\text{Between}}$, which measures how much of the total variance is
+explained by differences between group means. The second term on the right side
+is called the *within-groups* sum of squares $SS_{\text{Within}}$, which
+measures the variance within each group that is not explained by group
+membership (the error variance). So we have
+$$SS_{\text{Total}} = SS_{\text{Between}} + SS_{\text{Within}}.$$ If we divide
+each term by their associated degrees of freedom, we say that the total variance
+is partitioned into variance explained by group differences and unexplained
+variance (error).
+
+## Does this really work?
+
+Compute the three sums of squares for the age variable.
+
+```{r}
+# Determine the numbers of observations and groups
+N.total <- length(age) # all the ages
+N.groups <- aggregate(age,by=list(health),length)$x
+J <- length(N.groups) # number of groups
+
+# Compute the means
+grand.mean <- mean(age)
+group.means <- aggregate(age,by=list(health),mean)$x
+
+# Total sum of squares
+SS.total <- sum((age - grand.mean)^2)
+
+# Between-groups sum of squares
+SS.between <- sum(N.groups * (group.means - grand.mean)^2)
+
+# Within-groups sum of squares
+SS.within <- sum(aggregate(age,by=list(health),
+             function(x) sum((x - mean(x))^2))$x)
+# Alternative:
+# SS.within <- sum((N.groups - 1)*     
+#              aggregate(age,by=list(health),var)$x )
+
+# Check that the sums of squares add up
+cat('SS.total = ',SS.total)
+cat('\nSS.between = ',SS.between)
+cat('\nSS.within = ',SS.within)
+cat('\nSS.between + SS.within = ',SS.between + SS.within)
+```
+
+## 2. Your turn!
+
+Using your own dataset, compute the total, between-groups, and within-groups
+sums of squares for your dependent variable. Verify that the between and within
+sums of squares add up to the total.
+
+```{r}
+# Insert your code here
+```
+
+## The ANOVA F-Test
+
+Remember that $\overline{X}_j$ is the predicted value for each individual in
+group $j$. For the between-groups variance (sometimes called predicted
+variance), we will replace all the individual measurements $X_{ij}$ with their
+predicted values $\overline{X}_j$. For the within-groups variance (sometimes
+called residual or error variance), we will focus on the extent to which the
+predicted values $\overline{X}_j$ differ from the actual measurements $X_{ij}$.
+
+*If the null hypothesis is true*, the group means should be approximately equal
+or $\overline{\overline{X}} = \overline{X}_j$ for all $j$, so the only reason
+that any person's score should differ from the grand mean
+$\overline{\overline{X}}$ is because of sampling variance or error. Therefore,
+the between-groups variance should estimate the population variance
+$\sigma^2_e$. Keep in mind that, under the assumption of homoskedasticity, the
+sample variances within each group are also estimates of $\sigma^2_e$, so the
+within-groups variance should also estimate $\sigma^2_e$. Thus, if $H_0$ is
+true, the between-groups variance and the within-groups variance should be
+approximately equal.
+
+*If the null hypothesis is false*, at least one group mean $\overline{X}_j$ is
+different from the others, so the between-groups variance should be large
+relative to the within-groups variance. This leads us to the key idea behind
+ANOVA: we can test the null hypothesis of equality of means by comparing the
+between-groups variance to the within-groups variance. If the between-groups
+variance is significantly larger than the within-groups variance, we will reject
+$H_0$. If the two variances are approximately equal, we will fail to reject
+$H_0$. See the section below, "Back to the ANOVA Model," for more about this.
+
+To perform this comparison we need to convert the sums of squares into variances
+by dividing each sum of squares by its associated degrees of freedom. The
+between-groups variance has $J-1$ degrees of freedom (one less than the number
+of groups). This is because we are replacing each $X_{ij}$ with its group mean
+$\overline{X}_j$, and so the only degrees of freedom we have are selecting the
+values of the group means: the mean of these means must equal the grand mean
+$\overline{\overline{X}}$ and so the value of the last group mean is determined
+by the values of the other $J-1$ group means.
+
+The within-groups variance has $N_{\text{Total}} - J$ degrees of freedom (the
+total number of observations minus the number of groups). Within each group we
+have $N_j - 1$ degrees of freedom as for the usual computation of a sample
+variance. The total degrees of freedom for the within-groups variance is
+therefore the sum of the degrees of freedom across all groups, or $$
+\sum_{j=1}^J (N_j - 1) = \left(\sum_{j=1}^J N_j\right) - J = N_{\text{Total}} - J.
+$$
+
+Dividing each sum of squares by its degrees of freedom gives us the *mean
+square* for each source of variance:
+$$MS_{\text{Between}} = \dfrac{SS_{\text{Between}}}{J-1},$$ and
+$$MS_{\text{Within}} = \dfrac{SS_{\text{Within}}}{N_{\text{Total}} - J}.$$ These
+MS values give two different estimates of the variance $\sigma^2_e$ *if* $H_0$
+is true. The null hypothesis $$
+H_0: \mu_1 = \mu_2 = \cdots = \mu_J
+$$ can therefore be evaluated by the equivalent null hypothesis $$
+H_0: \sigma^2_{\text{Between}} = \sigma^2_{\text{Within}}
+$$ or $$
+H_0: \dfrac{\sigma^2_{\text{Between}}}{\sigma^2_{\text{Within}}} = 1.
+$$
+
+Estimating the variances with the mean squares leads to the ANOVA $F$-statistic,
+which is the ratio of the mean squares: $$
+F(J-1,N_{\text{Total}} - J) = \dfrac{MS_{\text{Between}}}{MS_{\text{Within}}},
+$$ with $J-1$ numerator and $N_{\text{Total}} - J$ denominator degrees of
+freedom. If $H_0$ is true, this ratio should be approximately 1. If $H_0$ is
+false, the ratio should be significantly larger than 1.
+
+# Fit an ANOVA Model
+
+Going back to the GSS data, we can fit an ANOVA model for age as a function of
+reported health using the `aov()` function in R. The commands in this chunk fit
+the model (but we won't see that yet) and produces a table of group means, group
+sizes, and the grand mean.
+
+```{r}
+# Fit a one-way ANOVA model
+age.model <- aov(age~health,data=data)
+model.tables(age.model, type = "means")
+```
+
+## The ANOVA Summary Table
+
+A lovely way to present the results of an ANOVA is via the ANOVA summary table,
+which can be obtained using the `summary()` function in `R`.
+
+```{r}
+summary(age.model)
+```
+
+Summary tables are no longer as popular as they used to be, because they take up
+a lot of space and don't convey much information beyond the $F$-statistic and
+the associated p-value. However, they do provide a nice way to see the
+partitioning of variance that is the foundation of ANOVA and to confirm that the
+computations that you think `R` is doing are correct.
+
+In the summary table above, you can see the partitioning of variance into
+between-groups and within-groups components. The between-groups component is
+identified by the name of the independent variable (health), and the
+within-groups component is identified by the label "Residuals." (Residual sum of
+squares is another name for within-groups sum of squares; you will also see it
+referred to as error sum of squares.)
+
+You can verify for yourself that these sums of squares are the same as the ones
+we computed earlier and that the Residual and health sums of squares add up to
+the total sum of squares. Another thing to notice is that the degrees of freedom
+for each source of variance sum to the total degrees of freedom,
+$N_{\text{Total}} - 1 = (J-1) + (N_{\text{Total}} - J)$.
+
+The $F$-statistic is the same that we would use to test the null hypothesis
+$H_0: \sigma_1^2 = \sigma_2^2$, so $F = s_1^2/s_2^2$, the ratio of two sample
+variances. In ANOVA, the sample variances that estimate the population variances
+$\sigma_{\text{Between}}$ and $\sigma_{\text{Within}}$ are $MS_{\text{Between}}$
+and $MS_{\text{Within}}$, which should be approximately equal if
+$H_0: \mu_1 = \mu_2 = \cdots = \mu_J$ is true. Thus, the $F$-statistic is
+$MS_{\text{Between}}/MS_{\text{Within}}$. This statistic follows an
+$F$-distribution with $J-1$ numerator and $N_{\text{Total}} - J$ denominator
+degrees of freedom.
+
+The degrees of freedom (Df) for the numerator and denominator of the
+$F$-statistic and p-value are presented in the summary table. The probability of
+obtaining an $F$-statistic as large or larger than the observed value under the
+null hypothesis is very small ($p$-value \< $\alpha$, if $\alpha = 0.05$), so we
+reject the null hypothesis of equality of means across reported health levels
+and conclude that at least one group mean is different from the others.
+
+## 3. Your turn!
+
+Using your own dataset, fit an ANOVA model for your dependent variable as a
+function of your categorical independent variable. Present the ANOVA summary
+table and interpret the results.
+
+```{r}
+# Insert your code here
+```
+
+## Back to the ANOVA Model
+
+Remember that the ANOVA model predicting $X$ from the group means can be written
+as $$
+X_{ij} = \mu + \tau_j + e_{ij},
+$$ where we defined $\mu$ to be the grand mean, $\tau_j$ is the effect of being
+in group $j$, and $e_{ij}$ is the error term which we assume is normal with mean
+0 and variance $\sigma_e^2$. We defined the effect $\tau_j$ to be
+$\tau_j = \mu_j - \mu$, the difference between the group mean and the grand
+mean. If $H_0$ is true, all the effects $\tau_j = 0$; "no effect of health."
+
+### The Sampling Distributions of the Mean Squares
+
+Because $MS_{\text{Within}}$ and $MS_{\text{Between}}$ are sample
+statistics they have their own sampling distributions (which are
+related to $\chi^2$ distributions). The means of these distributions are given
+by $$
+E[MS_{\text{Within}}] = \sigma^2_e,
+$$ and $$
+E[MS_{\text{Between}}] = \sigma^2_e + \dfrac{\sum_{j=1}^J N_j \tau_j^2}{J-1}.
+$$
+
+If $H_0: \mu_1 = \cdots = \mu_J$ is true, all the $\tau_j$s equal 0, so we would
+expect that $$
+F = \dfrac{MS_{\text{Between}}}{MS_{\text{Within}}} \approx \dfrac{\sigma^2_e}{\sigma^2_e} = 1.
+$$
+If $H_0$ is false, at least one $\tau_j \neq 0$, so we would expect that the $F$ statistic will be significantly greater than one, because the squared effects, the squared $\tau_j$s, will make the numerator larger. 
+
+### Interpreting the Model Parameters
+
+The interpretation of the model parameters $\mu$ and $\tau_j$ depends on how the
+independent variable is coded. In the formulation above we used *effect coding*,
+where $\mu$ is the grand mean and the effects are expressed as differences from
+the grand mean.
+
+An alternative is to define $\mu$ to be the mean of a reference or control
+group, say group 1, and define the effects as differences from that group. So we
+would have $$
+X_{ij} = \mu_1 + (\mu_j - \mu_1) + e_{ij} = \mu_1 + \delta_j + e_{ij},
+$$ where again $\delta_j$ is the effect of being in group $j$, but now defined
+as the difference between the group mean and the mean of the reference group. If
+$H_0$ is true, all the effects $\delta_j = 0$; "no effect of health."
+
+I bring this up to emphasize the fact that ANOVA is a kind of regression model,
+just like the simple regressions you have done in earlier classes where your
+goal was to predict a variable $Y$ from a single continuous variable $X$. The
+only difference is that here we are predicting $Y$ from a categorical variable
+with $J$ levels.
+
+The `aov()` function in `R` fits the ANOVA model using *dummy coding*, where the
+first level of the independent variable is treated as the reference group. You
+can see this by using the `summary.lm()` function on the fitted ANOVA model.
+
+```{r}
+summary.lm(age.model)
+```
+
+The intercept is the mean of the health=1 (excellent) group and the coefficients
+for the other levels of health are the differences between those group means and
+the reference group mean. For example, the coefficient for health=2 (good
+health) is 0.9109, which means that the mean age for respondents reporting good
+health is 0.9109 years older than the mean age for respondents reporting
+excellent health.
+
+Associated with each coefficient is a $t$-statistic and $p$-value testing the
+null hypothesis that the coefficient equals zero. You should interpret these
+tests with caution, however, because multiple comparisons increase the
+probability of Type I error. We will discuss this issue more when we get to post
+hoc tests.
+
+## 4. Your turn!
+
+Using your own dataset, use the `summary.lm()` function to examine the
+coefficients of your fitted ANOVA model. Interpret the coefficients and their
+associated t-statistics and p-values.
+
+```{r}
+# Insert your code here
+```
+
+# ANOVA Diagnostics
+
+ANOVA requires that the data meet certain assumptions, including normality of
+the residuals and homoskedasticity (equal variances across groups). Also, the
+presence of outliers may produce distorted results: outliers will increase the
+$SS_{\text{Within}}$, reducing the $F$-ratio, and consequently reducing the
+effect size and power. Now that we've fit the model we can look for signs that
+these assumptions hold.
+
+## Outliers
+
+We need to first check to see if we have outliers and, if so, whether they will
+influence the results of the analysis. You can do this by eye, looking at the
+box-and-whisker plots of the dependent variable (age) as a function of the
+independent variable (health). You can also apply some of the procedures for
+identifying outliers in a sample to the observations within each group (e.g.,
+you might label observations $X_{ij}$ more than $3 s_j$ from the group mean
+$\overline{X}_j$, or observations in the lowest or highest quantiles of the data
+distribution as outliers).
+
+This chunk of code looks for outliers defined as more than 3 standard deviations
+$s_j$s from the group mean and creates new variables `age.filtered` and
+`health.filtered` from which those outliers have been removed. (Note that there
+are [lots of `R` resources](https://statsandr.com/blog/outliers-detection-in-r/)
+for outlier detection)
+
+```{r}
+# Compute the group means and standard deviations
+# Group means were computed above
+# group.means <- aggregate(age,by=list(health),mean)
+sds <- aggregate(age,by=list(health),sd)$x
+
+# There are J groups (J is determined above)
+# J <- length(unique(health))
+
+# Evaluate each group for outliers that are 3 sds from the group
+# means
+# Store the outliers in a list
+outliers <- list()
+age.filtered <- health.filtered <- vector()
+for (i in 1:J) { 
+  # Compute upper and lower bounds as group.mean +/- 3 group.sd
+  group.data <- age[health == i]
+  group.mean <- group.means[i]
+  group.sd <- sds[i]
+  lower.bound <- group.mean - 3*group.sd
+  upper.bound <- group.mean + 3*group.sd
+
+  # Which values are farther than 3 group.sd from the group.mean  
+  group.outliers <- group.data[group.data < lower.bound | 
+                              group.data > upper.bound]
+  keep.data <- group.data[group.data >= lower.bound & 
+                              group.data <= upper.bound]
+  
+  # How many outliers in the group?
+  n.outlier <- length(group.outliers)
+  
+  # If none, set the values to -1
+  if(n.outlier==0) group.outliers<--1
+  
+  # Store the results in the list
+  outliers[[i]] <- c("group"=i,"N"=n.outlier,"values" = group.outliers)
+  
+  # Remove the outliers to make a new dataset
+  age.filtered <- c(age.filtered,keep.data)
+  health.filtered <- c(health.filtered,
+                      rep(i,times=length(keep.data)))
+}
+outliers
+```
+
+This method identifies 5 outliers: 3 in the health=1 group, 1 each in the
+health=2 and 3 groups, and none in the health=4 group. One reasonable approach
+is to do a *sensitivity analysis*: redo the analysis after removing the
+outliers. If nothing changes then you don't need to worry (much) about them. If
+your conclusions change then you have a problem. As an expert in your field, you
+will need to use some judgment about how to handle these observations. If you
+intend to remove them from the dataset, keep in mind that you will need to have
+determined in advance what the criteria for exclusion are (such as $\pm 3 s_j$)
+and preregister these criteria.
+
+```{r}
+# Do the ANOVA again with the filtered data
+health.filtered <- as.factor(health.filtered)
+filtered.model <- aov(age.filtered~health.filtered)
+summary(filtered.model)
+```
+
+The results of the ANOVA after removing the outliers are very similar to the
+original results, so we can be reasonably confident that the outliers are not
+having a big influence on the results.
+
+### Cook's Distance
+
+An outlier can be characterized by its leverage and its influence. Leverage
+quantifies the influence that a predictor/independent variable (health) has on
+the dependent variable (age). It is a function only of the predictor variable
+and is independent of the dependent variable. Influence measures the impact that
+a single observation has on the estimated model parameters. Observations with
+high influence, which is a function of both leverage and the distance of an
+observation from its group mean, can drastically change the outcome of an
+analysis and are therefore the most problematic. Influence is commonly measured
+with *Cook's distance.*
+
+An observation is considered influential if its Cook's distance $D_{ij}$ is
+greater than $4/(N_{\text{Total}}-J-1)$. While the formula for $D_{ij}$ is
+beyond the scope of this class, you won't be surprised to learn that there are
+`R` functions that will compute it for you.
+
+```{r}
+# Compute Cook's distance for each observation and flag those that have Cook's distances greater than 4/(N-k-1).
+D.limit <- 4/(N.Total - J - 1)
+cooks.d <- cooks.distance(age.model)
+influential <- which(cooks.d > D.limit)
+
+# Flag the influential observations in each group
+influence <- data.frame("health"=health[influential],  
+                                 "age"=age[influential],
+                                 "cooks.d"=cooks.d[influential])
+
+# List the influential observations by group
+inf.groups <- list()
+  for (i in 1:J) 
+      inf.groups[[i]] <-    
+      c("group"=i,"values"=influence[influence[,1]==i,2])
+inf.groups
+```
+
+You can see that the Cook's distance measure has identified more observations
+that are highly influential, and those that were identified by distance from the
+mean are included among these. Also while outliers identified by distance are
+all older respondents the Cook's distance measure also identifies younger
+respondents.
+
+In summary, there are potentially troublesome outliers in the GSS data. How we
+deal with them is an open question. If, after checking for coding errors or
+unique circumstances that led to the measurements, nothing seems amiss, then you
+can perform a sensitivity analysis as above. If the results are different with
+vs. without the influential points you have a fairly serious problem. *You must
+report any conflict between the results obtained with vs. without influential
+points.*
+
+### 5. Your turn!
+
+Conduct an outlier analysis for your data. If you determine that there are no
+outliers, describe this finding. If outliers are present, perform a sensitivity
+analysis. Describe your results. If the sensitivity analysis indicates a
+problem, discuss what you might do to resolve it.
+
+```{r}
+# Insert your code here
+```
+
+## Normality and Homoskedasticity
+
+The ANOVA model assumes that errors are normally distributed. Error is estimated
+as the difference between the observed values $X_{ij}$ and the predicted values
+$\hat{X}_{ij} = \overline{X}_j$ from the model. Because $$
+X_{ij} = \hat{X}_{ij} + e_{ij},  
+$$ the *residual* $X_{ij} - \hat{X}_{ij} = e_{ij}$. It is the residuals (errors)
+that we examine for normality and homoskedasticity, because the model says that $e_{ij} \sim \mathcal{N}(0,\sigma^2_e)$.
+
+A residual plot looks at the residuals $e_{ij}$ as a function of the predicted
+values $\hat{X}_{ij}$. These variables are returned as part of the `aov` model
+object.
+
+```{r}
+# Residual plot
+plot(age.model$fitted.values,age.model$residuals,
+     xlab="Fitted Values",ylab="Residuals",cex=.5)
+abline(h=0)
+```
+
+Notice that there are only 4 fitted (or predicted) values, because (again) the ANOVA
+model says that an individual's measurement $X_{ij}$ is predicted by the mean of
+the group $\overline{X}_j$ to which that individual belongs:
+$\hat{X}_{ij} = \overline{X}_j$. The horizontal line is placed at a residual
+value of 0.
+
+Things to look for in a residual plot are:
+
+1.  Symmetry about 0. Errors are normally distributed with mean 0. If the
+    residuals are asymmetric around 0, there is a failure of the normality
+    assumption. If the residuals for each group are not centered at 0 then there
+    is structure in the data that has not been captured by the ANOVA model.
+2.  Approximately equal ranges in residuals across groups. If the ranges are
+    evidently different, variance within each group differs across the groups
+    and homoskedasticity is violated.
+3.  Outliers. Outliers and influential values in the raw data will appear as
+    outliers in the residuals because the model will have difficulty predicting
+    them well.
+
+These features of a residual plot are indirect evidence of violations of
+assumptions. We can be more precise with QQ plots and statistical tests of
+homoskedasticity.
+
+### QQ plots
+
+Remember that a QQ plot plots theoretical quantiles from a specified
+distribution against the quantiles of the data. If a normal distribution is a
+good fit to the data then the QQ plot will show a nice straight line through the
+plotted points.
+
+```{r}
+# QQ plot of residuals
+qqnorm(age.model$residuals)
+# Add a best-fitting line
+qqline(age.model$residuals)
+```
+
+The plot shows a good fit to the normal distribution everywhere except in the
+lower quantiles of residuals. We can get even more precise by doing a
+*Shapiro-Wilk test* of normality. This test focuses specifically on the deviations from the
+line shown in the QQ plot.
+
+```{r}
+shapiro.test(age.model$residuals)
+```
+
+The $p$-value of the Shapiro-Wilk test statistic ($W$) is less that
+$\alpha=0.05$, so we reject the null hypothesis that the residuals are normally
+distributed. However, the Shapiro-Wilk test is very sensitive for large sample
+sizes like the GSS dataset, so the deviation from normality, while significant,
+may not be interesting.
+
+### Levene's Test of Equality of Variances
+
+It is not clear from the residual plot if the homoskedasticity assumption is
+violated. The ranges are different across the groups but it can't be determined
+just by looking if these differences are due to sampling error. To investigate
+this more closely, you can perform a Levene's test. This test is robust to
+violations of the normality assumption, which is something that we now need to
+be sensitive to.
+
+```{r}
+# Levene's test for homogeneity of variance (in car library)
+library(car)
+leveneTest(age.model)
+```
+
+The $p$-value for the Levene's test is greater than $\alpha=0.05$, suggesting
+that we can't reject the null hypothesis of homoskedasticity. So this assumption
+appears to hold for our data.
+
+### 6. Your turn!
+
+Perform a residual analysis of the ANOVA model fit to your data. Construct the
+residual and QQ plots and analyze them "by eye." Using Shapiro-Wilks and
+Levene's tests, determine the extent to which the ANOVA assumptions hold in your
+data.
+
+```{r}
+# Insert your code here
+```
+
+# Power and Effect Size
+
+Power analysis and effect size calculations are important for understanding the
+practical significance of ANOVA results. In contrast to comparisons between two
+means, effect size measures for ANOVA often focus on the proportion of variance
+explained by the independent variable.
+
+## Effect Sizes
+
+Like for the $t$-test, when the null hypothesis is false the $F$-ratio is not
+distributed as an $F$. Instead, again like the $t$ statistic, it follows a
+non-central $F$ distribution. So the issue of effect sizes is often cast in
+terms of a noncentrality parameter. If the central $F$ has parameters $\nu$ and
+$\delta$, the numerator and denominator degrees of freedom, the non-central $F$
+has parameters $\nu$, $\delta$, and $\lambda$, where $\lambda$ is the
+noncentrality parameter. We'll return to the computation of $\lambda$ in a
+moment.
+
+There are three common effect size measures for ANOVA: eta-squared ($\eta^2$),
+omega-squared ($\omega^2$) and Cohen's $f^2$. In contrast to the $d$ (distance)
+measures of effect size we used for t-tests, these are called $r$ (correlation)
+measures.
+
+Eta-squared is calculated as
+$$\eta^2 = \dfrac{SS_{\text{Between}}}{SS_{\text{Total}}}.$$ It represents the
+proportion of total variance in the dependent variable that is explained by the
+ANOVA model. (This is the same as the $r^2$ measure used in simple regression.)
+
+While simple, unfortunately $\eta^2$ is a biased estimate of the effect size: it
+tends to overestimate the proportion of variance explained, especially for small
+sample sizes. Omega-squared is a less biased estimate of effect size and is
+calculated as
+$$\omega^2 = \dfrac{SS_{\text{Between}} - (J - 1)MS_{\text{Within}}}{SS_{\text{Total}} + MS_{\text{Within}}}.$$
+
+Cohen's $f^2$ is a transformation of $\eta^2$: $$
+f^2 = \dfrac{\eta^2}{1 - \eta^2},
+$$ and when we talk about an effect size in ANOVA we usual mean Cohen's $f$,
+which is just $$
+f = \sqrt{\dfrac{\eta^2}{1 - \eta^2}}.
+$$
+
+The noncentrality parameter $\lambda$ for the non-central $F$ distribution is a
+function of Cohen's $f^2$: $$
+\lambda = f^2 \sum_{i=1}^k N_j.
+$$
+
+These are a lot of little formulas, and I present them so you know how to use
+them in `R` and to compute power using different functions in `R`.
+
+Like the Cohen's $d$ we encountered in tests of two means, there are guidelines
+for what we consider to be small, medium, or large effect sizes for $\eta^2$,
+$\omega^2$ and $f^2$:
+
+| Size           | $\eta^2,\omega^2$   |    | f    |
+|:---------------|:-------------------:|--- |:----:|
+|----------------|---------------------|    |------|
+| Small effect   | 0.01                |    | 0.10 |
+| Medium effect  | 0.06                |    | 0.25 |
+| Large effect   | 0.14                |    | 0.40 |
+|----------------|---------------------|    |------|
+
+These effects are easy to compute using commands from `R`'s `effectsize`
+package. Here is some code to compute $\eta^2$, $\omega^2$ and Cohen's $f$.
+
+```{r}
+# Calculate effect size
+eta.2 <- eta_squared(age.model)$Eta2
+omega.2 <- omega_squared(age.model)$Omega2
+cohens.f <- cohens_f(age.model)$Cohens_f
+```
+
+The `effectsize` library has a bunch of random functions that you might find
+useful. We can convert $\eta^2$ to $f^2$ using the `eta2_to_f2` function.
+
+```{r}
+f.2 <- eta2_to_f2(eta.2)
+f <- eta2_to_f(eta.2) # A fancy sqrt function
+
+# Check:
+cat("eta^2 = ",eta.2,", omega^2 = ",omega.2," Cohen's f = ",cohens.f)
+cat("\nf^2 = ",f.2," f = ",f) # returned by functions
+cat("\nf^2 = ",eta.2/(1-eta.2)," f = ",sqrt(f.2)) # check by hand
+```
+
+Both $\eta^2$ and $\omega^2$ indicate that reported health explains a small
+proportion of the variance in age. Cohen's $f$ also suggests a small effect
+size.
+
+### 7. Your turn!
+
+Using your own dataset, compute the effect sizes $\eta^2$, $\omega^2$ and
+Cohen's $f$ for your fitted ANOVA model. Interpret the results.
+
+```{r}
+# Insert your code here
+```
+
+## Power Analysis
+
+We've been using the `pwrss` package for power analysis with $t$-tests. It also
+provides functions for power analysis with ANOVA. For diversity, and because the
+anova power computations are a bit easier, we'll use the `pwr` package for power
+analysis with ANOVAs.
+
+To compute sample size for a given level of power we need the desired effect
+size, significance level, and the information necessary to compute degrees of
+freedom ($J-1$).
+
+```{r power-analysis}
+# Power analysis for one-way ANOVA of age~health data
+# Desired power
+one.minus.beta <- 0.80
+
+# (Desired) effect size (Cohen's f)
+cohens.f <- 0.25 # medium
+
+pwr.anova.test(k = 4, f = cohens.f, sig.level = 0.05,
+               power = one.minus.beta)
+```
+
+This output indicates that to detect a medium effect size ($f = 0.25$) with 80%
+power at $\alpha = 0.05$ with 4 groups, we need a total sample size of 180
+respondents (45 per group $\times$ 4).
+
+The `pwrss` package can perform a similar computation with the command
+`power.f.ancova`, but rather than Cohen's $f$ it requires $\eta^2$. An ANCOVA is
+a generalization of an ANOVA model in which predictor variables (like health)
+can be both categorical and numeric. Here is code equivalent to that for
+`pwr.anova.test` using `power.f.ancova`.
+
+```{r}
+# Convert f=0.25 to eta^2
+new.eta2 <- f2_to_eta2(0.25^2)
+# new.eta2 <- 0.25^2/(1 + 0.25^2) # by hand
+
+# Compute sample size for ANOVA with 4 groups and desired power 0.80
+power.f.ancova(new.eta2,factor.levels=4,power=.8,alpha=.05)
+```
+
+The `power.f.ancova` function returns a necessary total sample size of 180. It
+is assumed (and desirable) that the 4 group sizes be as equal as possible: 180/4
+= 45, exactly the number returned by the `pwr.anova.test` function.
+
+### 8. Your turn!
+
+Compute the post-hoc power of the ANOVA you performed on your own data. Compute
+Cohen's $f$ directly or use a combination of the `eta_squared` and `eta2_to_f`
+functions from the `effectsize` package. Then use the `pwr.anova.test` function
+to compute the power of your ANOVA given your sample size, number of groups, and
+effect size.
+
+```{r}
+# Insert your code here
+```
+
+# Mean Contrasts
+
+Go back to the issue of determining *why* an omnibus $F$-test is significant:
+which mean or means are different from the rest? There are two ways to handle
+this. One way is reflective of the "controversy" over performing one vs.
+two-tailed tests. You really should have some idea going into a study how things
+should turn out. Similarly, you should have some inkling of which conditions
+should show significant effects.
+
+1.  You're clueless: An omnibus $F$ is significant but you don't know why. In
+    this situation, you will perform *post-hoc* tests of means to figure out
+    which means are different. If the omnibus $F$ is not significant, *You. Can.
+    Not. Perform. Post. Hoc. Tests!*
+2.  You know which groups should differ from the others, because you are smart,
+    you're an expert, and you gave your experiment lots of thought before you
+    collected the data. In this situation you will perform *planned contrasts*
+    and you will not conduct an omnibus $F$ test at all.
+
+Here's some new vocabulary: A difference between means or combination of means
+is called a *contrast*.
+
+## Post-hoc tests
+
+Post hoc tests identify specific group differences if the ANOVA is significant.
+There are lots of options, each with different strengths and weaknesses:
+
+1.  The Bonferroni and Dunn-Šidák procedures
+2.  Newman-Keuls test
+3.  Scheffé test
+4.  Tukey's HSD test
+5.  Duncan's multiple range test
+
+We won't discuss them all.
+
+### Bonferroni and Dunn-Šidák
+
+Remember that if we have $J$ groups then, if we want to test all pairs of means,
+we will need to perform $M = \binom{J}{2} = J(J-1)/2$ $t$-tests. If we use
+something like $\alpha_{PC}=0.05$, where $PC$ indicates "per comparison," then
+the probability of making at least one Type I error will be
+$\alpha_{FW} = 1 - (1 - \alpha_{PC})^M$, which will be larger than $\alpha_{PC}$
+for all $M>1$. We call $\alpha_{FW}$ the *family-wise error rate*. Both the
+Dunn-Šidák and Bonferroni procedures "correct" $\alpha_{PC}$ to insure that
+$\alpha_{FW}$ is no greater than some desired value (like 0.05).
+
+The Dunn-Šidák correction simply inverts the equation for $\alpha_{FW}$:
+\begin{eqnarray*}
+\alpha_{FW} & = & 1 - (1 - \alpha_{PC})^M \\
+& \rightarrow & (1 - \alpha_{FW}) = (1 - \alpha_{PC})^M \\
+& \rightarrow & 1 - \alpha_{PC} = (1 - \alpha_{FW})^{1/M} \\
+& \rightarrow & \alpha_{PC} = 1 - (1 - \alpha_{FW})^{1/M}.
+\end{eqnarray*}
+
+So if $J = 4$ and our desired $\alpha_{FW} = 0.05$, then $M=6$ and $$
+\alpha_{PC} = 1 - (1 - 0.05)^{1/6} = 0.0085.
+$$ If we do each of our 6 tests and reject the 6 $H_0s$ only when the $p$-value
+is less than $\alpha_{PC} = 0.0085$ then our probability of making one or more
+Type I errors will be equal to $\alpha_{FW} = 0.05$
+
+To control the family-wise error rate at level $\alpha$ we can also use the
+less-precise but easier Bonferroni correction, which sets the per-comparison
+$\alpha_{PC} = \alpha_{FW}/M$, where $M$ is still the number of comparisons to
+be made. If again we want $\alpha_{FW} \le 0.05$ and $M=6$, then
+$\alpha_{PC} = 0.05/6 = 0.0083$. This value is slightly lower than the
+Dunn-Šidák correction, which means that the Bonferroni procedure is more
+conservative than the Dunn-Šidák procedure: it will be slightly harder to reject
+the $H_0s$ using Bonferroni but the per-comparison $\alpha$-level is easier to
+compute.
+
+One important thing to know about pairwise $t$-tests is how the standard error of
+the mean difference is computed. Remember for independent t-tests this is $$
+s_{\overline{X} - \overline{Y}} = s_P \sqrt{\dfrac{1}{N_X} + \dfrac{1}{N_Y}}
+$$ and $$
+s_P^2 = \dfrac{(N_X-1) s_X^2 + (N_Y-1) s_Y^2}{N_X + N_Y - 2}.
+$$
+
+For the pairwise $t$-tests across more than 2 groups, we will also use a pooled
+variance estimate, which we can do because of the homoskedasticity assumption of
+the ANOVA model. But now $$
+s_P^2 = \dfrac{\sum_{i=1}^J (N_i-1) s_i^2}{N_{\text{Total}} - J},
+$$ which is the same thing as $MS_{Within}$. So the standard error of the mean
+difference for a pair or means $\overline{X}_i - \overline{X}_j$ *following a
+significant omnibus* $F$ is $$
+s_{\overline{X}_i - \overline{X}_j} = \sqrt{MS_{Within}} \sqrt{\dfrac{1}{N_i} + \dfrac{1}{N_j}}.
+$$
+
+You could, of course, do all these $t$-tests one-by-one by hand. However, `R`
+has a tool to perform pairwise t-tests. The command is `pairwise.t.test`.
+
+```{r}
+# Compute the per-comparison alpha levels for alpha
+# J <- length(unique(health))
+M <- choose(J,2) # number of pairs
+alpha <- 0.05
+
+# Bonferroni PC error rate
+Bonferroni <- alpha / M
+
+# Dunn-Sidak PC error rate
+Dunn.Sidak <- 1 - (1 - alpha)^(1/M)
+cat("Bonferroni = ",Bonferroni," Dunn-Sidak = ",Dunn.Sidak)
+
+# Perform all M pairwise tests
+pairwise.t.test(x=age,g=health,p.adjust.method="none")
+```
+
+The `pairwise.t.test` function has a method to adjust $p$-values according to
+the desired correction factor. This method is specified by the `p.adjust.method`
+option. If you set `p.adjust.method="bonferroni"`, for example, it will multiply
+the $t$-test $p$-values by the value of $M$, allowing a comparison between the
+adjusted $p$-values and the desired familywise alpha level $\alpha_{FW}$ instead
+of the per-comparison alpha level $\alpha_{PC}$. I find this extraordinarily
+confusing so I set the $p$-value adjustment to "none." Keep in mind that there
+are a large number of possible correction procedures (we have only looked at the
+two most common), and so if you find yourself using one we haven't talked about
+this option might be useful.
+
+Returning to the output, you can see that we can reject the null hypothesis
+$H_0:~\mu_i = \mu_j$ for three comparisons: health=1 vs. health=3 and 4, and
+health=2 vs. health=4. There seems to be no significant difference between the
+two best levels of health (health=1 and 2), the two poorest levels of health
+(health=3 and 4), or between health=2 and health=3.
+
+There are some drawbacks to these two correction procedures. The primary
+drawback is that they are extraordinarily conservative. The per-comparison error
+rate can be orders of magnitude smaller than the desired familywise error rate,
+making it very difficult to reject $H_0$ (and hence greatly reducing power). The
+use of the pooled error variance estimate also means that the comparisons may
+not be independent, which is an assumption made by both correction methods --
+remember that computing $\alpha_{FW} = 1 - (1 - \alpha_{PC})^M$ assumes
+independence of the $M$ tests because we're multiplying the probabilities of
+*not* making a Type I error on each test together.
+
+For these reasons, alternatives to these correction factors are numerous and
+alternatives to pairwise $t$-tests have been developed. Some of these are listed
+above. For this notebook we will focus on the popular Tukey's Honestly
+Significant Difference test.
+
+### The Honestly Significant Difference
+
+Tukey defined an "honestly significant difference" (HSD) as a single number to
+which all mean differences could be compared simultaneously. Among post-hoc
+tests, it provides the best balance of power and control of the Type I error
+rate.
+
+The HSD test is based on the *Studentized range statistic* $q$, which is defined
+as $$
+q = \dfrac{\overline{X}_{\max} - \overline{X}_{\min}}{\sqrt{MS_{\text{Within}}/n}},
+$$ where the data ($X$) are drawn from a normal distribution,
+$\overline{X}_{\max}$ and $\overline{X}_{\min}$ are the largest and smallest
+group means, respectively, and $n = N_j, j=1,2,\ldots, J$ is the number of
+observations per group (assuming equal group sizes). The statistic $q$ follows a
+Studentized range distribution with parameters $J$ (the number of groups) and
+$\nu = N_{\text{Total}}-J$ (the degrees of freedom for $MS_{\text{Within}}$).
+
+The distribution of $q$ has root `tukey` in R, but the density function
+`dtukey` is not defined because it has no closed form. Only the quantile and
+probability functions `qtukey` and `ptukey` are defined. There is a plot of 4
+Studentized range distributions (for $k=3,6$ and $n=4,15$) in the lecture notes.
+A simulation of the $J=6,~n=15$ case is given in this code chunk. You can play
+around with $J$ and $n$ to see how these affect the shape of the distribution.
+
+```{r}
+# Simulate the Studentized range distribution for 4 sets of parameters
+J <- 6 # number of groups
+n <- 15 # group sizes
+
+q <- replicate(10000,{
+  # Simulate a dataset
+  data <- data.frame(X=rnorm(J*n),group=rep(1:J,each=n))
+  # Compute the pooled variance (MS_Within)
+  sp2 <- mean(aggregate(data$X,by=list(data$group),var)$x)
+  # Compute the values of q
+  means <- aggregate(data$X,by=list(data$group),mean)$x
+  (max(means)-min(means))/sqrt(sp2/n)
+})
+hist(q,breaks=seq(min(q)-.1,max(q)+.1,length=50))
+```
+
+Now we need to turn the statistic $q$ into an "honestly significant" mean
+difference HSD. We do this by first finding the critical value of $q$ that cuts
+off our desired $\alpha$ in the upper tail. This is done with the `qtukey`
+function. If $J=6$ and $n=15$, this value would be denoted as
+$q(1-\alpha,J,\nu = nJ - J)$. (Remember that $\nu$ is the number of degrees of
+freedom associated with $MS_{\text{Within}}$.)
+
+```{r}
+J <- 6
+n <- 15
+alpha <- 0.05
+qtukey(1-alpha,J,J*n-J)
+```
+
+The HSD is the (absolute) mean difference
+$\left| \overline{X}_{\max} - \overline{X}_{\min} \right|$ that makes the $q$
+statistic greater than the critical value $q(1-\alpha,J,\nu)$. Rearrange
+the equation for $q$ to solve for the significant mean difference:
+\begin{eqnarray*}
+q(1-\alpha,J,\nu)  & = & HSD/\sqrt{MS_{\text{Within}}/n} \\
+& \rightarrow & HSD = q(1-\alpha,J,\nu)\sqrt{MS_{\text{Within}}/n}.
+\end{eqnarray*}
+
+Continuing with our small example, if $MS_{\text{Within}} = 150$, then $$
+HSD = q(1-\alpha,J,\nu) \sqrt{MS_{\text{Within}}/n} = 4.5947 \sqrt{150/15} = 14.97.
+$$ If we compute all $\binom{J}{2} = 15$ mean differences, we would need to
+compare the absolute values of those differences to the $HSD = 14.97$. All
+absolute differences greater than 14.97 would be significant at the
+$\alpha = 0.05$ level.
+
+#### Unequal Sample Sizes
+
+An important thing to note is that up to now we have assumed equal group sizes
+$n$. If group sizes are unequal we need to figure out what to do with all the
+$N_js$. There's a few acceptable strategies for dealing with this, and one is to
+use the *harmonic mean* of the group sizes. Another is to compute
+$n = 2 N_{\max} N_{\min}/(N_{\max} + N_{\min})$, where $N_{\min}$ and $N_{\max}$
+are the sizes of the groups with the largest and smallest means.
+
+What `R` does, by contrast, is called the *Tukey-Kramer method*. Think back to
+the Welch's $t$-test, which is the test we used when we couldn't assume
+homoskedasticity. For the Welch's test, we estimated the standard error of
+$\overline{X}_1- \overline{X}_2$ as
+$\sqrt{\dfrac{s_1^2}{N_1} + \dfrac{s_2^2}{N_2}}$. The Tukey-Kramer method uses
+the same idea, estimating the standard error of
+$\overline{X}_i - \overline{X}_j$ as
+$SE_{ij} = \sqrt{\dfrac{1}{2} \left(\dfrac{MS_{\text{Within}}}{N_i} + \dfrac{MS_{\text{Within}}}{N_j}\right)}$.
+Thus the HSD will be slightly different for each difference, equal to
+$q_{ij}(1 - \alpha,J,\nu) SE_{ij}$.
+
+We'll finish this section by performing Tukey's HSD analysis with the
+Tukey-Kramer method, using R's `TukeyHSD` function.
+
+```{r}
+tukey.results <- TukeyHSD(age.model)
+cat("\n--- Tukey's Honestly Significant Difference (HSD) Results ---\n")
+print(tukey.results)
+plot(tukey.results)
+```
+
+This analysis shows significant differences between health=1 and health=3 and 4,
+and health=2 and health=4: the absolute values of these mean differences exceeds
+the HSD. `TukeyHSD` also provides a plot, if requested, of each observed value
+of $q$ centered within its 95% confidence interval. If the plotted interval does
+not include 0 (the dotted vertical line), then the mean difference is
+significant at the $\alpha = 0.05$ level.
+
+### 9. Your turn!
+
+Perform a post-hoc analysis of the ANOVA model you fit to your own data. Use the
+`pairwise.t.test` and `TukeyHSD` functions. If your omnibus $F$ was not
+significant, were any of the mean differences significant? Discuss what will
+happen to the Type I error rate if you do post hoc tests after failing to reject
+the omnibus hypothesis of all means being equal?
+
+```{r}
+# Insert your code here
+```
+
+## Planned Contrasts
+
+A contrast is a linear combination of group means used to test a specific
+hypothesis about those means. It allows you to focus the test on a theoretically
+interesting difference, rather than just every possible pairwise difference. It
+is the going into an analysis with an idea of what you want to find that allows
+you to bypass the omnibus $F$ test entirely.
+
+We use the notation $\Psi = c_1 \mu_1 + c_2 \mu_2 + \cdots + c_J \mu_J$ to
+define a contrast with the goal of testing the null hypothesis $H_0:~\Psi = 0$.
+The contrast coefficients $c_1, c_2, \ldots, c_J$ must sum to 0. The pairwise
+$t$-tests we did for post hoc tests are defined by one $c_i=1$, another $c_j=-1$
+and all the other $c_ks=0$. For example, we showed that the mean age for
+health=1 and health=3 were significantly different. This contrast is defined by
+the coefficient vector $(1,0,-1,0)$, or
+$\Psi = (1) \mu_1 + (0) \mu_2 + (-1) \mu_3 + (0) \mu_4 = \mu_1 - \mu_3$.
+
+My hypothesis is that people who report better levels of reported health
+(health=1 and 2) are younger than those who report poorer levels of reported
+health (health=3 and 4), because aging generally has negative impacts on overall
+health. I planned to test this hypothesis in advance of collecting the data, and
+the contrast that describes this pattern of results is defined by the
+coefficient vector $c(1/2,1/2,-1/2,-1/2)$. Note that you have some flexibility
+in selecting the values of the coefficients. They should appropriately weight
+the means to reflect the hypotheses of interest. It is common practice to select
+them so that the absolute value sums to 2, consistent with $\Psi$ representing a
+difference between two averaged groups.
+
+The coefficient vector $c(1/2,1/2,-1/2,-1/2)$ defines the contrast
+$\Psi = (1/2)\mu_1 + (1/2)\mu_2 - (1/2) \mu_3 - (1/2)\mu_4 = \dfrac{\mu_1 + \mu_2}{2} - \dfrac{\mu_3 + \mu_4}{2}$:
+if $\Psi = 0$ then the mean of the two best health groups is equal to the mean
+of the two poorest health groups.
+
+But how do we test $H_0:~\Psi = 0$? Turns out that's pretty simple. First we
+compute the observed value of the contrast, which is $$
+\hat{\Psi} = \sum_{j=1}^J c_j \overline{X}_j.
+$$ Then we need to compute the sum of squares for the contrast $\Psi$, which
+should equal $MS_{\text{Within}}$ approximately if $\Psi=0$. The sum of squares
+for $\Psi$ is given by $SS_{\Psi} = \hat{\Psi}/w$, where
+$w = \sum_{j=1}^J c_j^2/N_j$. This sum of squares has only 1 degree of freedom,
+so $MS_{\Psi} = SS_{\Psi}$.
+
+Finally, we compute the $F$-ratio for the contrast as
+$MS_{\Psi}/MS_{\text{Within}}$, which follows an $F$ distribution with 1
+numerator and $N_{\text{Total}}-J$ degrees of freedom.
+
+Here's how we do this in R. There's a useful package, `multcomp`, that makes
+this easy. First we'll do the computations by hand, then we'll use the package.
+
+```{r}
+# Define the contrasts of interest
+contrast.mx <- rbind(
+  "Good health vs Poor health" = c(.5, .5, -.5, -.5),  
+  "Best health vs Rest" = c(1, -1/3, -1/3, -1/3)
+)
+# Group means and group sizes were computed earlier
+# group.means <- aggregate(age,by=list(health),mean)$x
+# N.groups <- as.numeric(table(health))
+
+# Pull out MS_Within from the ANOVA summary 
+MS.Within <- summary(age.model)[[1]][["Mean Sq"]][2]
+
+# Compute the p-value of the first contrast by hand
+Psi.hat <- contrast.mx %*% group.means
+w <- rowSums(contrast.mx^2 / rbind(N.groups,N.groups))
+SS.Psi <- (Psi.hat)^2 / w
+MS.Psi <- SS.Psi # 1 df
+F.value <- MS.Psi / MS.Within
+p.value <- 1 - pf(F.value,1,sum(N.groups)-length(N.groups))
+data.frame(Psi.hat,MS.Psi,F.value,p.value)
+```
+
+Now use the multcomp package to do the contrasts.
+
+```{r}
+library(multcomp)
+# Use the glht and mcp functions to compute contrasts
+age.glht <- glht(age.model,linfct=mcp(health=contrast.mx))
+summary(age.glht,test=adjusted("none"))
+```
+
+The output from the glht function looks a little different from what we computed
+by hand. There are several reasons for this, but be reassured that the two
+analyses are equivalent.
+
+First, the glht function computes t-values rather than F-values. This is okay,
+because we know that a squared $t$ with $J$ degrees of freedom is equal to an
+$F$ with 1 and $J$ degrees of freedom. You can verify that the $t$-statistics
+output by glht are equal to the square roots of the $F$-values we computed by
+hand.
+
+```{r}
+# Verify that t^2 = F
+cat("From the glht function:\n")
+summary(age.glht)$test$tstat^2
+cat("\nFrom our by-hand calculations:\n")
+F.value
+```
+
+Second, the glht function provides standard errors rather than mean squares.
+Again, this is okay because we can compute mean squares from standard errors.
+The standard error of the $t$ statistic for a contrast $\Psi$ is computed as
+$SE_{\Psi} = \sqrt{MS_{\text{Within}} w}$. Thus we can compute the mean square
+for the contrast as $MS_{\Psi} = SE_{\Psi}^2 / w$. You can verify that the mean
+squares we computed by hand are equal to those computed from the standard errors
+output by glht.
+
+```{r}
+# Verify that MS.Within = SE.Psi^2 / w and that SE.Psi = sqrt(MS.Within * w)
+# Standard errors from the glht output
+SE.Psi.glht <-summary(age.glht)$test$sigma
+SE.Psi.glht
+
+# Compute the standard errors from the MS.Within and the w we computed by hand
+sqrt(MS.Within * w)
+
+# Compute MS.Within from the standard errors in the glht output
+SE.Psi.glht^2 / w
+MS.Within
+```
+
+Finally, note that the p-values output by glht are the same as those we computed
+by hand.
+
+```{r}
+# Verify that p-values are almost equal
+cat("From the glht function:\n")
+summary(age.glht,test=adjusted("none"))$test$pvalues
+cat("\nFrom our by-hand calculations (times 2 for two-tailed):\n")
+p.value
+```
+
+OK, but wait! Didn't we just two two $t$-tests (and two $F$-tests)? Aren't we
+supposed to adjust our alpha level if we do multiple tests? Yes, yes we are. The
+`glht` function makes this adjustment via that `test=adjusted()` option in the
+`summary` function. By saying "none" for this we forced `summary` not to adjust
+for multiple comparisons. By default `ghlt` uses the something called a
+"single-step method" (similar to the Bonferroni correction) to inflate the
+$p$-values and penalize us appropriately for multiple tests.
+
+```{r}
+summary(age.glht)
+```
+
+Compare these adjusted $p$-values to those we computed using the unadjusted
+method. Note that the $p$-values are larger now, approximately twice those of
+the unadjusted values, reflecting the penalty for multiple tests.
+
+### 10. Your turn!
+
+Perform planned contrasts on your own data. Define at least two contrasts that
+reflect interesting hypotheses about your data. Use either the by-hand method or
+the `glht` function from the `multcomp` package. Explain your results.
+
+```{r}
+# Insert your code here
+```
+
+## Orthogonal Contrasts
+
+When you perform multiple planned contrasts, it is important to consider whether
+the contrasts are *orthogonal* or not. Orthogonal contrasts are statistically
+independent of one another, meaning that the outcome of one contrast does not
+influence the outcome of another. This independence is important because it
+allows for clearer interpretation of results and helps maintain the overall Type
+I error rate when multiple contrasts are tested.
+
+Two contrasts defined by coefficient vectors $c^{(1)}$ and $c^{(2)}$ are
+orthogonal if $$\sum_{j=1}^J N_j c_j^{(1)} c_j^{(2)} = 0.$$ If the group sizes
+are equal, this reduces to the simpler condition
+$$\sum_{j=1}^J c_j^{(1)} c_j^{(2)} = 0.$$
+
+For example, consider the two contrasts we defined earlier for the health
+variable: 1. Good health vs Poor health: $c^{(1)} = (0.5, 0.5, -0.5, -0.5)$ 2.
+Best health vs Rest: $c^{(2)} = (1, -1/3, -1/3, -1/3)$ To check if these
+contrasts are orthogonal, we compute the sum of the products of their
+coefficients: $$
+(0.5)(1) + (0.5)(-1/3) + (-0.5)(-1/3) + (-0.5)(-1/3) = 0.5 - 0.1667 + 0.1667 + 0.1667 = 0.6667 \neq 0.$$
+(Weighting by sample sizes also results in a sum that is not equal to 0.)
+Because the sum is not zero, these contrasts are not orthogonal.
+
+We talked about partitioning total variance in ANOVA. When contrasts are
+orthogonal, the sums of squares associated with each contrast adds up to the
+total sum of squares between groups. This means that each contrast explains a
+unique portion of the variance in the data, allowing for a clearer understanding
+of how different factors contribute to group differences.
+
+When contrasts are not orthogonal, they do not cleanly partition the variance.
+Their variances overlap and the sum of squares for the contrasts will not add up
+to the total sum of squares between groups, making it harder to discern the
+unique contribution of each contrast.
+
+When planning contrasts, it is often beneficial to design them to be orthogonal,
+especially when multiple contrasts are being tested. This helps ensure that each
+contrast provides distinct information about the group differences and maintains
+the integrity of statistical inferences. However, not all research questions can
+be addressed with orthogonal contrasts; sometimes non-orthogonal contrasts are
+necessary to test specific hypotheses.
+
+For $J$ groups there are at most $J-1$ orthogonal contrasts. There are different
+kinds of orthogonal contrasts, including polynomial contrasts (which test for
+linear, quadratic, cubic, etc. trends across ordered groups) and Helmert
+contrasts (which compare each group mean to the mean of subsequent groups). You
+can also create your own custom contrasts designed to test specific hypotheses
+while maintaining orthogonality.
+
+```{r}
+# Define orthogonal contrasts for 4 groups
+poly.contrasts <- contr.poly(4)
+helmert.contrasts <- contr.helmert(4)
+print("Polynomial Contrasts:")
+print(poly.contrasts)
+print("Helmert Contrasts:")
+print(helmert.contrasts)
+```
+
+The `contrasts` function in `R` can be used to incorporate contrasts into an
+ANOVA. The `split` option in the `summary` function tells `R` to break down the
+sum of squares into components associated with each contrast.
+
+```{r}
+# Fit ANOVA model with polynomial contrasts
+contrasts(health) <- poly.contrasts
+age.poly.model <- aov(age ~ health)
+summary(age.poly.model,
+        split=list(health=list("Linear"=1,
+                              "Quadratic"=2,
+                              "Cubic"=3)))
+```
+
+Setting $\alpha_{PC} = 0.05/3 = 0.0167$ to control the family-wise error rate at
+$\alpha_{FW} = 0.05$ for the three contrasts, we see that only the linear
+contrast is significant. This analysis suggest that the variance in age across
+health levels is primarily explained by a linear trend, with no significant
+quadratic or cubic components.
+
+Note that the `split` option only works when the contrasts are orthogonal. If
+you try to use it with non-orthogonal contrasts or with unequal group sizes the
+values that `summary` returns will not be the same as those that you compute by
+hand. If you want to use non-orthogonal contrasts or have unequal group sizes,
+you should use the `glht` function from the `multcomp` package as we did
+earlier.
+
+### 11. Challenge: Your turn!
+
+Define at least two orthogonal contrasts for your own data. You can use
+polynomial, Helmert, or your own orthogonal contrasts. Perform the analysis
+using either the `split` option in the `summary` function or the `glht` function
+from the `multcomp` package. Explain your results.
+
+```{r}
+# Insert your code here
+```
+
+## Summary
+
+Post hoc and planned contrasts allow you to test specific hypotheses about group
+means. Post hoc contrasts require a significant omnibus F test; planned
+contrasts do not require this.
+
+Bonferroni and Dunn-Šidák corrections are simple ways to control the family-wise
+error rate $\alpha_{FW}$ when performing multiple post hoc tests, but they are
+conservative and reduce power. Tukey's HSD test provides a better balance of
+power and Type I error control for post hoc tests and does not require
+adjustment to the per-comparison alpha level $\alpha_{PC}$.
+
+Planned contrasts, although they do not require a significant omnibus F test,
+will require adjustments for multiple comparisons. Bonferroni or Dunn-Šidák
+corrections can be used here as well, but you might consider using the `glht`
+function from the `multcomp` package to do the heavy lifting.
+
+The use of orthogonal contrasts and post hoc pairwise t-tests share the
+characteristic that neither approach is based on a theoretical understanding of
+the data. Orthogonal contrasts are statistically independent, but they may not
+reflect the hypotheses of interest. Pairwise $t$-tests examine all possible mean
+differences, but many of these may not be theoretically interesting. When
+possible, it is best to define planned contrasts that reflect your theoretical
+understanding of the data, and remember to adjust your $\alpha_{PC}$ level to
+maintain a low $\alpha_{FW}$ error rate.
+
+# Factorial ANOVA
+
+To this point we have been doing "one-way" ANOVAs with a single categorical
+independent variable. Now we'll expand that to two. When we have observations in
+each combination of levels of two categorical independent variables, we call
+this a "two-way" or "factorial" ANOVA. Factorial ANOVAs allow us to examine not
+only the *main effects* of each independent variable on the dependent variable,
+but also whether there is an *interaction effect* between the two independent
+variables. We could have more than two independent variables, of course, but for
+now we'll stick with two for simplicity. The principles we discuss here will
+generalize to more than two independent variables.
+
+Let's load up the data again and start from scratch.
+
+```{r}
+data <- read.csv("GSS_1980.csv",header=TRUE)
+# Pull out variables of interest
+happy <- data$HAPPY
+age <- data$AGE
+health <- data$HEALTH
+```
+
+For the functions we'll use later, it's important to have equal sample sizes, so
+we'll first collapse health=3 and 4 into a single category ("not good") and then
+pull out 25 observations from each combination of health and happy.
+
+```{r}
+# Collapse health=3 and 4 into a single category
+health.sub <- health
+health.sub[health==4] <- 3
+
+# Change health and happy to factors
+health.sub <- factor(health.sub)
+happy.sub <- factor(happy)
+```
+
+Subset the data to ensure equal sample sizes in each combination of health and
+happy.
+
+```{r}
+set.seed(1234) # for reproducibility
+# Pull 25 observations from each combination of health and happy and make a new dataset from them
+data.sub <- data.frame()
+# For each level of health
+for (i in levels(health.sub)) {
+  # and each level of happy
+  for (j in levels(happy.sub)) {
+    # extract all observations in the cell
+    combo.obs <- which(health.sub == i & happy.sub == j)
+    # and choose 25 of them at random.
+    if (length(combo.obs) > 25) obs <- sample(combo.obs, 25,replace=FALSE)
+    # Add them to the new data frame
+    data.sub <- rbind(data.sub,
+                      data.frame(health=rep(i,length(obs)),
+                                 happy=rep(j,length(obs)),
+                                 age=age[obs]))
+  }
+}
+# Pull the variables out of the data frame so we don't have to type $ signs
+age.sub <- data.sub$age
+health.sub <- data.sub$health
+happy.sub <- data.sub$happy
+```
+
+Take a quick look at the subsetted data.
+
+```{r}
+# Make a box and whisker plot
+Desc(age.sub ~ health.sub + happy.sub, 
+     main="Age by Health and Happiness",
+     xlab="Health and Happiness Levels",
+     ylab="Age")
+```
+
+The difference between a one-way and a two-way ANOVA is in how the sums of
+squares are partitioned. In a one-way ANOVA we partition the total sum of
+squares into between groups $SS_{\text{Between}}$ and within groups
+$SS_{\text{Within}}$ sums of squares. In a two-way ANOVA we partition the total
+sum of squares into three between groups sums of squares (one for each
+independent variable and one for the interaction between them) and the within
+groups sum of squares.
+
+To partition the variance in this kind of design, consider first the contingency
+that counts the number of observations in each combination of the levels of each
+independent variable.
+
+```{r}
+table("J"=health.sub,"K"=happy.sub)
+```
+
+I renamed the two independent variables $J$ and $K$ so that we can understand
+the notation a little better. I'm also going to let $J$ and $K$ represent the
+number of levels of each factor. It should be clear which I mean whenever I use
+it (and if it isn't please let me know.)
+
+Each frequency (25) of the pairs of levels of $J$ and $K$ in the table above
+represents a "cell" of the experiment. In this case there are $J=3$ levels of
+health and $K=3$ levels of happy, for a total of $J \times K = 9$ cells. Each
+cell has $N_{jk}$ observations, where $j=1,2,\ldots,J$ and $k=1,2,\ldots,K$. The
+total number of observations across all cells is
+$N_{\text{Total}} = \sum_{j=1}^J \sum_{k=1}^K N_{jk}$. An individual measurement
+in the $jk^{th}$ cell is denoted as $X_{ijk}$, where $i=1,2,\ldots,N_{jk}$
+indexes the individual observations within that cell.
+
+Now things will get a little strange but stick with me. We need to define
+several means to help us partition the variance. The grand mean of all
+observations across all cells is
+$\overline{\overline{X}} = \dfrac{1}{N_{\text{Total}}} \sum_{j=1}^J \sum_{k=1}^K \sum_{i=1}^{N_{jk}} X_{ijk}$.
+Note the addition of a new summation sign that corresponds to the sum over the
+second independent variable $K$.
+
+We need to compute *marginal* sample sizes and means for each level of each
+factor. The notation will use a dot to indicate the factor over which the sample
+sizes and means are being taken. So, for example, the number of observations in
+level $j$ of variable $J$ will be written as $N_{j \cdot}$. The means of the
+observations at level $j$ of factor $J$ is
+$\overline{X}_{j\cdot} = \dfrac{1}{N_{j \cdot}} \sum_{k=1}^K \sum_{i=1}^{N_{jk}} X_{ijk}$.
+The mean of the observations at level $k$ of factor $K$ is similarly
+$\overline{X}_{\cdot k} = \dfrac{1}{N_{\dot k}} \sum_{j=1}^J \sum_{i=1}^{N_{jk}} X_{ijk}$.
+
+Finally, we need the cell means. The mean of the observations in the $jk^{th}$
+cell is $\overline{X}_{jk} = \dfrac{1}{N_{jk}} \sum_{i=1}^{N_{jk}} X_{ijk}$.
+
+Consider again the total sum of squares $SS_{\text{Total}}$. We will compute
+this the same way as before: $$
+SS_{\text{Total}} = \sum_{k=1}^K \sum_{j=1}^J \sum_{i=1}^{N_{jk}} \left(X_{ijk} - \overline{\overline{X}} \right)^2
+$$ Note that this is just the numerator of $s^2_X$ without regard to any group
+structure.
+
+```{r}
+# Compute the grand mean and total variance
+N.Total <- length(age.sub)
+grand.mean <- mean(age.sub)
+grand.var <- var(age.sub)
+
+# Compute the total sum of squares
+SS.Total <- sum((age.sub - grand.mean)^2)
+
+cat("Grand Mean:", grand.mean, "\n")
+cat("Total Sum of Squares:", SS.Total, "\n")
+
+# Notice that SS.Total = (N.Total - 1) * grand.var
+cat("Verification:", (N.Total - 1) * grand.var, "\n")
+```
+
+In one-way ANOVA we talked about $SS_{\text{Between}}$ and $SS_{\text{Within}}$.
+In two-way ANOVA the $SS_{\text{Between}}$ will be replaced with
+$SS_{\text{Cells}}$, which is computed in the same way: $$
+SS_{\text{Cells}} = \sum_{k=1}^K \sum_{j=1}^J N_{jk} \left( \overline{X}_{jk} - \overline{\overline{X}} \right)^2.
+$$
+
+But now, we will partition the $SS_{\text{Cells}}$ into three components: the
+sum of squares $SS_J$ associated with factor $J$, the sum of squares $SS_K$
+associated with factor $K$, and the sum of squares $SS_{JK}$ associated with the
+interaction between factors $J$ and $K$. These are computed as follows: $$
+SS_J = \sum_{j=1}^J N_{j \cdot} \left( \overline{X}_{j \cdot} - \overline{\overline{X}} \right)^2,
+$$
+$$SS_K = \sum_{k=1}^K N_{\cdot k} \left( \overline{X}_{\cdot k} - \overline{\overline{X}} \right)^2,
+$$ and then, because the interaction term is what's left over after accounting
+for the main effects of $J$ and $K$,
+$$SS_{J \times K} = SS_{\text{Cells}} - (SS_J + SS_K).
+$$
+
+The only thing we have to compute now is the within groups sum of squares, which
+can be computed by pooling the cell variances $s^2_{ij}$ the same way as before.
+However, knowing that
+$SS_{\text{Total}} + SS_{\text{Cells}} + SS_{\text{Within}}$, $$
+SS_{\text{Within}} = SS_{\text{Total}} - SS_{\text{Cells}},
+$$ which is a bit easier.
+
+Treat the age variable $X$ as a function of health $J$ and happiness $K$. We
+might expect to see age increase with increases in health (remember that
+health=1 is excellent health and health=4 is poor health). We might also expect
+to see differences in age with reported happiness (happy people might tend to be
+older because they are more stable, or unhappy people might tend to be older
+because of poor health or having lost friends and family). There might also be
+an *interaction* between health and happiness, such that the age difference
+between happy and less happy people might be less for unhealthy than for healthy
+people.
+
+Let's fit the ANOVA model and look for these sums of squares in the output. For
+the `aov` function, we specify two independent variables by expanding the model
+formula from `age.sub ~ health.sub` to `age.sub ~ health.sub + happy.sub + health.sub:happy.sub`, where
+happy is the second independent variable and `health.sub:happy.sub` indicates an
+interaction between health and happy. The `+` signs indicate that we are
+including main effects for both health and happy, while the `:` indicates that
+we are including an interaction effect between health and happy.  An equivalent formula is `age.sub~health.sub*happy.sub`, which includes main effects and the interaction explicitly.
+
+```{r}
+# Fit the two-way ANOVA model
+age.factorial.model <- aov(age.sub ~ 
+                    happy.sub + health.sub + 
+                    health.sub:happy.sub)
+summary(age.factorial.model)
+```
+
+You can validate the degrees of freedom and sums of squares computed by `R` by
+computing them by hand. This chunk of code computes the degrees of freedom and
+sums of squares for the main effects, interaction, and error
+($SS_{\text{Within}}$). For each main effect, if there are $J$ and $K$ levels of
+factors $J$ and $K$, respectively, then the degrees of freedom for each main
+effect is $df_J = J-1$ and $df_K = K-1$. The degrees of freedom for the
+interaction effect is $df_{J \times K} = (J-1)(K-1)$. The degrees of freedom for
+the within groups variance is $df_{\text{Within}} = N_{\text{Total}} - JK$; 
+think about this one as you did for the one-way ANOVA where you subtracted off
+the number of levels, but now you're subtracting off the number of cells. The
+sum of the main effects and interaction degrees of freedom should equal the
+total degrees of freedom between groups:
+$df_J + df_K + df_{J \times K} = JK - 1$.
+
+```{r}
+# Compute cell means
+cell.means <- aggregate(age.sub, by=list(health.sub, happy.sub), mean)
+colnames(cell.means) <- c("health", "happy", "mean")
+
+# Compute marginal means
+marginal.means.health <- aggregate(age.sub, by=list(health.sub), mean)
+colnames(marginal.means.health) <- c("health", "mean")
+marginal.means.happy <- aggregate(age.sub, by=list(happy.sub), mean)
+colnames(marginal.means.happy) <- c("happy", "mean")
+
+# Compute sample sizes
+N.jk <- as.matrix(table(health.sub, happy.sub))
+N.j.dot <- rowSums(N.jk)
+N.dot.k <- colSums(N.jk)
+
+# Compute the degrees of freedom
+df.Health <- length(N.j.dot)-1 # J-1
+df.Happy <- length(N.dot.k)-1 # K-1
+df.HealthHappy <- df.Health*df.Happy # (J-1)(K-1)
+df.Within <- N.Total - length(N.j.dot)*length(N.dot.k) # N.Total - JK
+
+# Compute SS_Cells
+SS.Cells <- sum(N.jk * (matrix(cell.means$mean, 
+                nrow=3, ncol=3) - grand.mean)^2)
+# Compute SS_Health
+SS.Health <- sum(N.j.dot * (marginal.means.health$mean - grand.mean)^2)
+# Compute SS_Happy
+SS.Happy <- sum(N.dot.k * (marginal.means.happy$mean - grand.mean)^2)
+# Compute SS_Interaction
+SS.Interaction <- SS.Cells - (SS.Health + SS.Happy)
+# Compute SS_Within
+SS.Within <- SS.Total - SS.Cells
+
+# Display results so far
+factorial.anova <- data.frame("Source" = c("Health","Happy","Health:Happy","Within"),
+          "Df"=c(df.Health,df.Happy,df.HealthHappy,df.Within),
+          "SS" = c(SS.Health,SS.Happy,SS.Interaction,SS.Within))
+factorial.anova
+```
+
+To complete the ANOVA table we need to compute the mean squares and F-ratios for
+each source of variance. The mean squares are computed as usual:
+$MS_{\text{Source}} = SS_{\text{Source}}/df$. The F-ratios are also computed as
+usual: $F = MS_{\text{Source}}/MS_{\text{Within}}$.
+
+```{r}
+# Compute the mean squares
+MS.Health <- SS.Health / df.Health
+MS.Happy <- SS.Happy / df.Happy
+MS.Interaction <- SS.Interaction / df.HealthHappy
+MS.Within <- SS.Within / df.Within
+factorial.anova$MS <- c(MS.Health, MS.Happy, MS.Interaction, MS.Within)
+
+# Compute the F ratios
+F.Health <- MS.Health / MS.Within
+F.Happy <- MS.Happy / MS.Within
+F.Interaction <- MS.Interaction / MS.Within
+factorial.anova$F <- c(F.Health, F.Happy, F.Interaction,NA)
+
+# Compute the F p-values; note the degrees of freedom
+p.Health <- 1 - pf(F.Health, df.Health, df.Within)
+p.Happy <- 1 - pf(F.Happy, df.Happy, df.Within)
+p.Interaction <- 1 - pf(F.Interaction, df.HealthHappy, df.Within)
+factorial.anova$p.value <- c(p.Health, p.Happy, p.Interaction,NA) 
+factorial.anova
+```
+
+Check now to see that the `factorial.anova` data frame gives the same values as
+the `summary` output.
+
+### Unequal Sample Sizes
+
+If the experiment is not balanced (equal sample sizes in each cell), because the
+`aov` function returns what is called "Type I" sums of squares, they will not be
+equal to the sums of squares you compute by hand. Furthermore, the sums of
+squares will change depending on the order of the variables in the formula
+passed to `aov`. This is because the sums of squares for each source can no
+longer be perfectly partitioned: there will be some influence of factor $J$ in
+the main effect of $K$ and vice versa.
+
+Go back to the full GSS_1980 dataset.  Fit the factorial ANOVA model in two ways, with health first and then with happy first.
+```{r}
+# Fit the two-way ANOVA model with health entered first
+summary(aov(age~health+happy+health:happy))
+
+# Now put happy first
+summary(aov(age~happy+health + health:happy))
+```
+
+If you compute the sums of squares by hand you will see that the sums of squares
+for health equals the sums of squares computed by `aov` when health is first.
+The sums of squares for happy equals the sums of squares computed by `aov` when
+happy is first.
+
+A detailed explanation for why this happens is beyond the scope of this notebook
+(but check
+[this](https://bookdown.org/ndphillips/YaRrr/type-i-type-ii-and-type-iii-anovas.html)
+link). Briefly, Type I sums of squares are computed by fitting different models
+sequentially, starting with the simplest and adding factors one by one. Type III
+sums of squares are computed by fitting all factors first and then removing them
+one at a time. There are also Type II and IV sums of squares. Each type of sums
+of squares has its uses, but Types II and III are generally preferred for
+unbalanced designs because the results are independent of the order in which the
+factors are specified in the model formula.
+
+For unbalanced designs you can use the `Anova` function from the `car` package,
+which computes Type II and III sums of squares that are independent of the order
+in which the independent variables are specified in the model formula. I've
+always used Type III sums of squares, but the reason for this is [probably based
+mostly in
+tradition](https://seriousstats.wordpress.com/2020/05/13/type-ii-and-type-iii-sums-of-squares-what-should-i-choose/)
+and not any strong theoretical foundation.
+
+```{r}
+# Fit the two-way ANOVA model to the whole dataset using lm() and then Anova() from the car package
+age.Anova <- lm(age~health+happy+happy:health)
+Anova(age.Anova,type="III")
+```
+
+Only the main effect of `happy` is significant at an $\alpha=0.05$ level.  But wait...
+
+### How Many Tests?
+
+You probably wondered about doing three $F$-tests and the Type I error inflation problem we talked about earlier in the context of pairwise $t$-tests.  Good for you!
+
+Yes, [you should correct your alpha level to accommodate 3 tests](https://link.springer.com/article/10.3758/s13423-015-0913-5).  Be aware that people will argue with you about this.  The conservative and statistically "pure" approach would be to reduce the per-comparison alpha level according to something like the Bonferroni or Dunn-Šidák correction.  Common practice, however, is to argue that the ANOVA model you just fit is a single test, the sums of squares are independent from each other (if the group sizes are equal), and performing a correction is "too conservative."  
+
+If you use a Bonferroni correction for the alpha-level in the ANOVA you just performed, $\alpha_{PC} = 0.05/3 = 0.0167.$  In this case, there are no significant main effects of or interactions between health and happy on respondent age in the full data set.  In the subsetted (balanced) dataset the main effect of happy is still significant after the correction.
+
+### 12. Your turn!
+
+Choose two independent variables and one dependent variable and plot the means
+of the dependent variable as a function of the values of the two independent
+variables.
+
+1.  What does the mean pattern look like? Are there any main effects? Is there
+    an interaction?
+2.  Fit an ANOVA model predicting the dependent variable from the two
+    independent variables and their interaction. Use `aov` (if there are roughly
+    equal group sizes) or `Anova` if the groups are unequal. Describe your
+    results and provide an interpretation. Are the significant (and
+    insignificant) effects consistent with what you saw in your plots?
+
+```{r}
+# Insert your code here
+```
+
+# Repeated Measures ANOVA
+
+Repeated measures ANOVA is used when the same subjects are measured under
+different conditions or at different time points. This design accounts for the
+correlation between measurements taken from the same subject, which can increase
+statistical power.
+
+For this section we'll use some (simulated) recognition memory data. Five
+participants are given 3 lists of 40 words each to memorize. Depending on the
+list, they are limited to 500ms, 1000ms, or 1500ms per word. At test, the words
+just studied are mixed with 40 new words and shown to the participants one at a
+time. They are told to respond "yes" if the word was studied and "no" if the
+word is new. The number of correct responses is recorded.
+
+```{r}
+memory <- c(43, 52, 62, 47, 65, 75, 62, 71, 79, 55, 67, 71, 36, 46, 57)
+participant <- as.factor(rep(1:5,each=3))
+times <- as.factor(rep(c(500,1000,1500),times=5))
+```
+
+For repeated measures designs, the participant factor is treated like an
+independent variable, but we say that the time factor is "nested" within it. (Variables like "participant" are called *random effects*, and models that include both fixed factors (like times) and random effects (like participant) are called mixed-effects models.)  The
+way that the sums of squares are partitioned is determined by the formula passed
+to `aov` (or `Anova`). The big difference between a one-way ANOVA and a
+(one-way) repeated measures ANOVA is that for the repeated measures ANOVA we
+have to tell `aov` what the error term ($MS_{\text{Error}}$) is. It isn't
+$MS_{\text{Within}}$ any more.
+
+```{r}
+summary(aov(memory~times+Error(participant/times)))
+```
+
+The output shows that the main effect of time is significant at an $\alpha=0.05$
+level.
+
+### 13. Challenge/Extra: Your turn!
+
+If you have a repeated measure in your dataset, perform an ANOVA to determine if
+that treatment has a significant effect on your dependent measure. Describe your
+results.
+
+```{r}
+# Insert your code here
+```
+
+# 14. Conclusions
+
+Think about what you've done in this notebook.
+
+a. What was the most important thing you learned?
+b. What was the hardest concept to understand?
+c. What surprised you the most?
+
+> Insert your responses here
+
+```{r}
+# Insert your code here
+```

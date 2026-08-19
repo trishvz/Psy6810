@@ -1,0 +1,1067 @@
+---
+title: "Module 1 - Foundations III"
+author: "TVZ"
+output:
+  word_document:
+    toc: true
+    toc_depth: '3'
+  html_document:
+    df_print: paged
+    toc: true
+    toc_depth: 3
+  pdf_document:
+    toc: true
+    toc_depth: 3
+editor_options:
+  markdown:
+    wrap: 80
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Upload the libraries used in this document
+library("ggplot2")
+library("tinytex")
+library("extraDistr")
+library("sysid")
+```
+
+# Learning Objectives
+
+At the end of this part of Module 1 you should be able to:
+
+1. Define a random variable.
+2. Determine if a random variable is discrete or continuous by identifying and examining its sample space.
+3. Explain the difference between a raw and a central moment of a distribution.
+4. Explain the difference between a probability function and a probability density function.
+5. Use probability functions to compute cumulative probabilities for discrete random variables.
+6. Explain how area under the curve of a probability density function relates to the probability of different outcomes of a continuous random variable.
+7. List the criteria for a function to be a probability or probability density function.
+8. Use the expectation and variance operators to compute the population means and variances of simple random variables and combinations of random variables.
+9. Describe the purpose of each R function in a distribution "quad."
+10. Explain the characteristics of the following discrete distributions:
+    a. Discrete uniform;
+    b. Bernoulli;
+    c. Binomial;
+    d. Poisson; and
+    e. Tabled.
+11. Explain the characteristics of the following continuous distributions:
+    a. Continuous uniform; 
+    b. Normal;
+    c. Student's $t$;
+    d. $\chi^2$; and
+    e. $F$.
+12. Recognize how the parameters of these distributions are used to compute their (population) means and variances.
+13. Use the R functions in each distributions' quads to compute probabilities and quantiles associated with variables sampled from the distributions.
+14. Simulate samples from a given distribution using the rxxxx() functions.
+15. Explain simple relationships between different distributions.
+16. Construct a QQ plot.
+    
+# Reading in Data
+
+This notebook will continue using the GSS data described in Foundations I.
+
+```{r}
+data <- read.csv("GSS_1980.csv",header=TRUE)
+names(data) <- c("X","income","sibs","age","happy","healthy","youngen")
+data$X <- NULL
+age <- data$age # Pull out age into its own variable to save typing later
+```
+
+# Random Variables
+
+Reading: [Random variables, key concepts](https://distribution-explorer.github.io/background/review_of_key_concepts.html)
+
+Video: [Random variables](https://www.khanacademy.org/math/statistics-probability/random-variables-stats-library)
+
+We have used the terms "measurement," "observation," "variable," "score," etc. without restriction to this point.  The numerical objects that are the focus of these terms can more formally be called random variables.  A random variable $X$ is a mapping between a sample space $S$ and the real numbers $\mathcal{R}$: 
+$$
+X:S \rightarrow \mathcal{R}.
+$$ 
+This mathematical definition simply insures that we can assign values to the outcomes of $X$ from the set of real numbers.  I.e., $X$ takes on numerical values. For example, if $X$ is the roll of a die, then $S=\{H,T\} \rightarrow \{0,1\}$.
+
+The youngen variable in the GSS dataset indicates whether a person agreed or disagreed with a statement,  Although "agree" and "disagree" are not numbers, marking down a 1 when someone agrees or a 2 when they disagree turns youngen into a random variable: the sample space \{"agree","disagree"\} is mapped to the set of real numbers \{1,2\}.
+
+Random variables are distinguished by whether they are discrete or continuous, and their behavior is determined by the *distributions* that they follow.  As we continue, recall that we refer to an unknown measurement as $X_i$ for individual $i$ and its observed value as $x_i$.  Also recall that a statistic like $\overline{X}$ or $s^2$ are measurements of a group and are also random variables.
+
+In the first notebook you described the variables in your data set.  Think about the random variables that correspond to these variables.  For some (e.g. age) the mapping from the variable value to the real numbers is explicit in the measurement itself.  For others (e.g. youngen) the mapping is something that you or someone else selected.  For what kinds of data variables is it most likely that you will need to provide a mapping?
+
+## Discrete Random Variables
+
+Definition: The variable $X$ is a discrete random variable if for every real number $r \in R$ there exists some probability that $X$ equals r: $0 \le Pr(X = r) \le 1$.  This $Pr(X = r)$ could be zero, i.e., the event that $X$ is equal to $r$ is impossible.  Or this $Pr(X=r)$ could be 1, i.e., $X$ is always equal to $r$.  
+
+The sample space $S$ for a discrete random variable is either finite, like the number of spots on the face of a die ($S = \{1,2,3,4,5,6\}$), or *countably infinite*, such as the number of times you might have to flip a coin before the coin comes up heads ($S=\{0,1,2,3,\ldots\}$).
+
+Note that the values in the sample space of a discrete random variable do not have to be integers.  You might, for example, want to examine the proportion of 100 exam questions answered correctly, which would have a sample space $S=\{0,.01,.02,\ldots,.99, 1.00)\}$.
+
+For discrete random variables the function $p_X(r) = Pr(X = r)$ is called a probability function or a probability mass function.  If any function $p_X(r)$ satisfies the following constraints then it is a probability function (even if we don't know what $X$ is):
+
+1. $0 \le p_X(r) \le 1.0$ for all $r \in S$.
+2. $\sum_{r \in S} p_X(r) = 1$
+
+Note the parallels between these criteria and the axioms of probability.
+
+## Continuous Random Variables
+
+Definition: $X$ is a continuous random variable if its sample space, which we will call *support*, $S$ is neither finite nor countably infinite: it is uncountably infinite and of the same size as the set of real numbers $\mathcal{R}$.  This does not mean that the support $S = \mathcal{R}$ but only that is of the same size.  You might remember that the set of real numbers between 0 and 1 is the same size as the set of real numbers between $-\infty$ and $\infty$.  (The size of a set is called its cardinality, and the "cardinality of the continuum" $\mathcal{R}$ is $\aleph_1$, "aleph-one".)
+
+There is an important distinction between discrete and continuous variables that involves the quantity $Pr(X=r)$.  We stated above that if $X$ is discrete then $0 \le Pr(X=r) \le 1$, and in particular there must be values of $r$ for which $Pr(X=r) > 0$, because $\sum_{r \in S} Pr(X=r) = 1$.  For a continuous random variable $X$, the probability $Pr(X = r) = 0$ for all $r \in S$.
+
+Wut?
+
+To understand this, consider the following example: A [spinner](https://g.co/kgs/eHe21wz) is marked around its diameter with a clock face.  Let $X$ be the position on the wheel's circumference under the spinner's pointer after a spin.  Then the support for $X$ is the set $(0,12]$ (or $[0,12)$). That is, $X$ can take on any real value between 0 and 12: 1.5, 6.23, 3.14, etc.. (But we can't have both 0 and 12 in the support because those two numbers represent exactly the same position, so we'll choose one of them arbitrarily and exclude the other.)
+
+$X$ is continuous because there are an uncountably infinite number of possible values that $X$ could take on between 0 and 12.  Suppose that for the uncountably infinite number of values $r \in S$ there exist probabilities $\epsilon>0$ such that $Pr(X=r) = \epsilon$, where $\epsilon$ is a constant.  Then because there are an infinite number of values in $S$
+$$
+\sum_{r \in S} Pr(X = r) = \epsilon \cdot \infty = \infty,
+$$
+violating the axioms of probability.
+
+Another way of thinking about it is if there are $\aleph_1 = \infty$ number of possibilities in the support $S$, then the probability of one of those events is $1/\aleph_1 = 1/\infty = 0$.
+
+So, instead of defining a probability function $p_X(r) = Pr(X=r)$ for continuous random variables, we define a probability *density* function $f_X(r)$ that describes how "dense" the values of the random variable are around different values of $r$.  A function $f_X(r)$ is a density function if it satisfies the following constraints:
+
+1. $f_X(r) \ge 0$ for all $r \in \mathcal{R}$ and
+2. $\int_{-\infty}^{\infty} f_X(r) dr = 1$.
+
+As with the discrete probability function $p_X(r)$, an arbitrary function $f_X(r)$ is a density function if it satisfies these constraints, even if we don't know what $X$ is.
+
+# Distribution Functions
+
+Reading: [Cumulative distribution functions](https://en.wikipedia.org/wiki/Cumulative_distribution_function#Definition)
+
+The behaviors of different random variables are determined by their distributions, or their probability or probability density functions.  Think back to the relative frequency and cumulative relative frequency distributions that describe the distributions of observations in a data set.  The concept of a distribution in the context of a random variable is (almost) exactly the same.  
+
+Regardless of whether a random variable is discrete or continuous we can in most circumstances write down a function that gives us the variable's *cumulative* probability, $Pr(X \le r)$ for $r \in \mathcal{R}$.  We call this a cumulative distribution function (sometimes just a distribution function) for both discrete and continuous variables.  
+
+If $X$ is discrete, its distribution function is 
+$$
+P_X(r) = \sum_{x \le r} p_X(x).
+$$
+If $X$ is continuous, its distribution function is
+$$
+F_X(r) = \int_{-\infty}^r f_X(x) dx.
+$$
+
+Something to keep in mind for continuous variables is that the density function $f_X(x)$ doesn't always exist.  The density function is the derivative of the distribution function; if the distribution function is not differentiable then there is no density (see, e.g., the [Cantor distribution](https://en.wikipedia.org/wiki/Cantor_distribution)).  This fact is not something that you will need to worry about in this class.
+
+Another thing to keep in mind is that while the probability function has values that are less than or equal to 1 (because they are probabilities), the density function can have values that are greater than 1.  Again, this is because the density function does not give us probabilities.  Density functions must be positive and integrate to 1 but there is no constraint that their values must be less than 1.
+
+## 1. Your turn!
+
+The following code chunk plots the probability density function for the normal distribution (the bell curve).  Play around with the provided values for mu (the mean) and sigma (the standard deviation).  What happens when you change these values?  What do you have to do to get the density function to exceed the value 1?  Why do you think this is happening?
+
+```{r}
+# Initialize the mean and standard deviation of the population (play with these values)
+mu <- 0
+sigma <- 1
+
+# Plot the density function
+z <- seq(mu-4*sigma,mu+4*sigma,length=200) # Think about why I set the x-axis values like this
+plot(z,dnorm(z,mu,sigma),ylab="Density",xlab="Variable Values",type='l')
+```
+
+## Aside: Integrals
+
+If you haven't had/done calculus recently or ever, the integral sign above might make you nervous.  Don't be nervous! You do not have to know any calculus for this class.  Here are a few ways to think about the integration operation denoted by $\int$.
+
+1.  Integration computes the area under a curve.  Probability is area.  If you see $\int_a^b$ it means that you want the area under a curve between the values $a$ and $b$ on the x-axis.  Sometimes you will be able to figure out the area just by looking at a picture of the density function.  For example, consider the function 
+$f_X(x) = -|x| + 1$ for values of $x$ in the range (-1,1) and $f_X(x) = 0$ for values of $x$ outside the range $(-1,1)$.  So $(-1,1)$ is the support of $X$.
+
+```{r}
+x <- seq(-1,1,by=.1) # Define x values
+f <- -abs(x) + 1 # Compute f(x)
+plot(x,f,type='l',xlab="Values of X",ylab="Density Function")
+abline(h=0,v=0)
+```
+
+This function is a triangle with its apex at $x=0$.  This function is also a density function because $f_X(x) \ge 0$ for all $x \in \mathcal{R}$ and $\int_{-\infty}^{\infty} f_X(x) dx = 1$.  
+
+You don't need to know how to integrate to know that the area under the curve $f_X(x)$ is one: it's two right triangles stuck back to back, each triangle has area $1/2$.  You can also see that $\int_{-\infty}^0 f_X(x) dx = 1/2$.  
+
+2.  The integral sign $\int$ is an elongated *S*.  It mirrors the Greek $\Sigma$, which is also an S that indicates taking a sum over a sequence of values.  The notation $f_X(x) dx$ is the area of a tiny rectangle of width $dx$ and height $f_X(x)$.  So integrating between $a$ and $b$ is what we get when we add up the areas of tiny rectangles between $a$ and $b$ while letting the width of the rectangles get extremely tiny.
+
+3. Any time you are required to compute an integral (find area under a curve) in this class you will be able to do it in R or the answer will be obvious.
+
+4. The area under a probability density function between the values $a$ and $b$, where $a<b$ is equal to the difference between the cumulative distribution functions at those values:
+\[
+\int_a^b f_X(x) dx = F_X(b) - F_X(a). 
+\]
+(Think about why this is true.)
+
+Because all of the distributions we will be working with in this class have well-defined cumulative distribution functions that are programmed for you, you will never have to compute an integral by hand (unless you want to).
+
+
+## GSS example
+
+We have worked with the cumulative distribution of the age data in the GSS survey to compute quantiles.  
+
+```{r}
+p <- table(age)/sum(table(age)) # compute the relative frequencies
+P <- cumsum(p) # compute the cumulative distribution function
+```
+
+Consider now the fact reflected in Thought #4 above, that the probability of being between two values is the difference between the values of the distribution function at those two values.  So what is the probability that I sample a respondent between the ages of 30 and 40 (inclusive)?
+
+```{r}
+P["40"] - P["29"] # Probability that 30 <= age <= 40
+```
+
+What is the probability that I sample a respondent whose age is below the mean age of the group?
+```{r}
+# The age < mean(age) statement will return TRUE and FALSE values.  The proportion of values 
+# for which this is TRUE can be computed as the mean of age<mean(age).  
+# When you do math with TRUE/FALSE values the TRUEs turn into 1 and the FALSEs turn into 0.
+# Also the mean of TRUE/FALSE values is the proportion of TRUEs.
+mean(age < mean(age)) 
+```
+
+
+## 2. Your turn!
+
+Pick one of your quantitative variables.  Compute:
+
+1. the probability that a value chosen at random from the observations of this variable will be less than the mean of the variable;
+2. the probability that a value chosen at random from the observations of this variable will be more than 4 standard deviations from the mean of the variable;
+3. for two reasonably interesting numbers the probability that a value chosen at random will fall between them.
+
+> INSERT YOUR CODE HERE
+
+# Revisit: Populations and Parameters
+
+Returning to the distinction between populations and samples, a sample is a subset of observations taken from a larger population, and the population is assumed to contain all possible measurement values and to be of infinite size.  
+
+In fact, the distributions we are discussing in this notebook describe populations.  Each distribution has parameters that determine a population's characteristics such as its mean and variance.  These population measures of central tendency and dispersion are functions of the distribution parameters. 
+
+## Expected Value and Variance
+
+Reading: [Expected value](https://en.wikipedia.org/wiki/Expected_value)
+
+Videos: 
+
+1. [Expected value of a discrete random variable](https://www.khanacademy.org/math/statistics-probability/random-variables-stats-library/random-variables-discrete/v/expected-value-of-a-discrete-random-variable)
+2. [Variance and standard deviation of a discrete random variable](https://www.khanacademy.org/math/statistics-probability/random-variables-stats-library/random-variables-discrete/v/variance-and-standard-deviation-of-a-discrete-random-variable)
+
+You've probably thought of the population mean as an unknown constant floating around free somewhere in a population without really considering where it comes from.  If the distribution of a random variable $X$ is known, then we can (usually) determine the population mean as the *expected value* of that random variable.
+
+The expected value of $X$ with sample space $S$ is defined as 
+$$E[X] = \sum_{x \in S} x p_X(x)$$
+when $X$ is discrete.  You should recognize this as a weighted mean: each value $x \in S$ is weighted by its relative frequency (probability) $p_X(x)$ in the population.   
+
+The expected value of the continuous random variable $X$ with support $S$ is defined as 
+$$
+E[X] = \int_{x \in S} x f_X(x) dx
+$$
+when $X$ is continuous.
+
+The variance of a distribution is the expected value of the squared deviation scores in the population.  That is,
+\[
+Var(X) = E[(X - \mu)^2] = E[(X - E(X))^2].
+\]
+The expectation $E()$ in the definition of the variance takes the appropriate discrete or continuous form.  
+
+Compare the expressions for the expected value and (population) variance to the parallel sample statistics $\overline{X}$ and $s^2$.  The expected value is a weighted mean, and the variance is the weighted mean of the squared deviation values.
+
+### Aside: The expected value doesn't always exist!
+
+Not every distribution has a mean (or variance).  Really!
+
+The [Cauchy distribution](https://en.wikipedia.org/wiki/Cauchy_distribution), for example, even though it is symmetric around 0, continuous, unimodal, and looks almost exactly like a normal distribution (see below), does not have a mean because the expected value of this distribution is infinite.  It does, however, have a median and a mode.)
+
+```{r}
+
+z <- seq(-4,4,length=200)
+plot(z,dnorm(z),xlab="Values",ylab="Density",type='l',col="black")
+lines(z,dcauchy(z),col="purple")
+legend("topright",legend=c("Normal","Cauchy"),lty=1,col=c("black","purple"))
+```
+
+In this plot you can see that the Cauchy distribution has very "heavy" tails; a lot of the values are spread a very far distance from the mean.  Because of this, the expected value of the Cauchy as defined by the integral of $x f_X(x)$ is equal to $\infty - \infty$, which is [undefined](https://en.wikipedia.org/wiki/Indeterminate_form).
+
+I'm getting carried away with something that you don't need to worry about, but here is a really cool demonstration of this.
+
+Remember how if the sample size is large enough the sample mean should be approximately equal to the population mean (the Law of Large Numbers)?  This chunk of code generates two very large samples, one from a Cauchy distribution centered at 0 and with scale = 1 and the other from a normal distribution centered at 0 with standard deviation = 1.  While the normal sample's mean will always be close to 0, the Cauchy sample's mean will bounce around unpredictably.  
+
+```{r}
+# Rerun this chunk several times (click the little green arrow over there ---> )
+great.big.sample <- 100000
+X <- rcauchy(great.big.sample,0,1)
+Y <- rnorm(great.big.sample,0,1)
+cat("Cauchy=",mean(X),"Normal=",mean(Y))
+```
+
+([Isn't that fun?](https://i.chzbgr.com/full/5266676736/h08D852F4/trust-me-happy-sheep-i-dont-plan-on-it))
+
+### Expectation and Variance Operators
+
+Expectation is called a *linear operator*, which means that for two random variables $X$ and $Y$ and two constants $a$ and $b$,
+$$E(aX + bY) = aE(X) + bE(Y).$$
+This relationship follows from the distributive property of sums and integrals.  More specifically,
+for any constant $c$,
+
+1. $E(c) = c$,
+2. $E(X+c) = E(X) + c$, and
+3. $E(cX) = cE(X)$.
+
+(Note the similarity of these rules to the rules for summation.)
+
+We can also define a variance operator such that $Var(X) = E[(X-\mu)^2]$.  Variance is *not* a linear operator because the expectation is being taken over a nonlinear function of $X$: $(X-\mu)^2$.  We can show that the following rules must hold for the variance:
+
+1. $Var(c) = 0$
+2. $Var(cX) = c^2 Var(X)$;
+3. $Var(X + c) = Var(X)$;
+4. $Var(aX + bY) = a^2 Var(X) + b^2 Var(Y)$ if and only if $X$ and $Y$ are independent.
+
+Note that Rule 4 implies that $Var(X+Y) = Var(X-Y)$ if $X$ and $Y$ are independent, because $b^2 = 1$ if $b= \pm 1$.
+
+### GSS Data
+
+The following block of code demonstrates some of the rules of expectation.  I will use the mean() and var() functions, which are sample statistics functions, but the rules hold for sample statistics just as they do for population parameters.
+
+```{r}
+# Start with expected values
+# Define an arbitrary constant and make it a vector:
+const.1 <- 25
+const.vec <- rep(25,times=length(age)) # We only need this for Rule 1
+
+# Rule 1
+cat("Constant value = ",const.1,", Mean =",mean(const.vec))
+
+# Rule 2
+cat("Mean of (X+c) = ",mean(age+const.1),", (Mean of X) + c = ",mean(age)+const.1)
+
+# Rule 3
+cat("Mean of cX = ",mean(const.1*age),", c times Mean of X = ",const.1*mean(age))
+
+# Choose another variable from the GSS dataset:
+siblings <- data$sibs
+# Define a new constant:
+const.2 <- -10
+
+# General Rule
+cat(
+  "Mean of (aX + bY) = ",mean(const.1*age + const.2*siblings),
+  ", a*Mean of X + b*Mean of Y = ",const.1*mean(age) + const.2*mean(siblings)
+)
+
+# Now let's do the variance:
+
+# Rule 1
+cat("Constant value = ",const.1,", Variance =",var(const.vec))
+
+# Rule 2
+cat("Variance of (X+c) = ",var(age+const.1),", Variance of X = ",var(age))
+
+# Rule 3
+cat("Variance of cX = ",var(const.1*age),", c^2 times Variance of X = ",const.1^2*var(age))
+
+# Rule 4
+cat(
+  "Variance of (aX + bY) = ",var(const.1*age + const.2*siblings),
+  ", a^2*Variance of X + b^2*Variance of Y = ",const.1^2*var(age) + const.2^2*var(siblings)
+)
+
+```
+
+### 3. Your turn!
+
+1. Explain why Rule 4 for the variance didn't work here. 
+2. Choose two variables from your dataset and verify the rules for expectations and variances as I did for the GSS variables age and siblings.  Did Rule 4 hold for you?  Whether it did or not, what does that imply about your two variables?
+
+> INSERT YOUR CODE HERE
+
+## Moments
+
+The expected value (population mean) of a distribution is also called the *first moment* of the distribution.  The second *raw* moment of a distribution is $E(X^2)$, and the second *central* moment is $E[(X-E(X))^2] = E[(X-\mu)^2]$.  The second central moment is the population variance $\sigma^2$.  Higher moments are related to other aspects of a distribution's shape:
+
+|Moment | Raw | Central | Related Statistic |
+|:---:|:---:|:---:|:---:|
+|1 | $E(X)$   | $E(X)$            | Mean 
+|2 | $E(X^2)$ | $E[(X - E(X))^2]$ | Variance 
+|3 | $E(X^3)$ | $E[(X - E(X))^3]$ | Skewness 
+|4 | $E(X^4)$ | $E[(X - E(X))^4]$ | Kurtosis 
+
+
+A distribution is uniquely characterized by its moments.  That is, if two distributions have the same (infinite number of) moments, then they must be the same.  For the lists of distributions that follow I have provided for each their mean $\mu$ and variance $\sigma^2$ (their first and second moments).  If you want a challenge, try to compute $\mu$ and $\sigma^2$ for some of them using the definitions of the expected value and variance above.
+
+# R and Distributions
+
+Here is a useful resource: https://rstudio.github.io/r-manuals/r-intro/Probability-distributions.html
+
+One of the most powerful features of R is the way that it permits you to work with a very large set of distributions, both continuous and discrete.  A list of these distributions can be found by entering "?distributions" at the console prompt.  Even more can be found in the "extraDistr" package. Also check the link to the R manual above.
+
+```{r}
+# Uncomment this chunk if you haven't installed this package yet
+# install.packages("extraDistr")
+# library("extraDistr")
+```
+
+Distributions in R come in "quads."  There will be a root name (like "norm" for "normal") and that name will be preceded by the letters d, p, q, and r.  For name xxxx,
+
+1. dxxxx is the density or probability function;
+2. pxxxx is the cumulative distribution function;
+3. qxxxx is the quantile function (the inverse of the distribution function); and
+4. rxxxx is the random sampling function, which simulates a sample from the xxxx distribution.
+
+Each function in the quad will need parameters that determine the shape of the distribution and its moments.
+
+# Distributions
+
+Reading: [Probability distribution explorer](https://distribution-explorer.github.io/index.html)
+
+In this section I will take you through the density functions, parameters, expected values and variances of the 10 most important distributions you will encounter during standard data analyses.  There are [many more](https://en.wikipedia.org/wiki/List_of_probability_distributions) distributions, and you will probably encounter some peculiar ones during your time as a social scientist.  
+
+## Discrete Distributions
+
+There are 5 discrete distributions that you must be able to identify and work with in statistics and data analysis.  These are the:
+
+1. Uniform
+2. Bernoulli
+3. Binomial
+4. Poisson
+5. Tabled
+
+### Uniform
+
+Reading: [Discrete Uniform Distribution](https://distribution-explorer.github.io/discrete/discrete_uniform.html)
+
+You have already encountered a uniform distribution: this is the distribution that describes the number of spots $X$ that occur as the result of a roll of a fair die.  
+
+If there are $m$ possible outcomes in the sample space of $X$, then a uniform distribution places equal probability on each outcome: $Pr(X = x_i) = 1/m$.  
+
+The uniform distribution is sometimes called the *rectangular* distribution because of its shape when plotted.
+
+```{r}
+x <- 1:6
+p.x <- rep(1/6,times=length(x))
+
+plot(x,p.x,xlab="Number of Spots",ylab="Probability Function",
+     type='p')
+segments(x0=x,y0=0,x1=x,y1=p.x)
+```
+
+Something to be careful of when visualizing a discrete probability function is connecting points:
+
+```{r}
+plot(x,p.x,xlab="Number of Spots",ylab="Probability Function",
+     type='b',main="A Misleading Plot")
+```
+
+Connecting the points with lines implies that the probability of values between the integers 1, 2, etc. is also $1/6$ when in fact those probabilities are zero. It is okay to plot a discrete probability function as a histogram or, as above, an impulse plot, where it is clear that there are no values implied between the integers.  Recall from earlier that we plot the probabilities for such integer values between the "real" lower and upper values of the integers (e.g., 1.5-2.5 for the value 2).
+
+```{r}
+hist(x,xlab="Number of Spots",ylab="Probability Function",
+     freq=FALSE,breaks=seq(.5,6.5,by=1),main="")
+```
+
+(You can see why this distribution is sometimes called the rectangular distribution.)  There is one strong benefit to plotting a discrete probability function as a histogram, and that is that it becomes obvious that probability can be equated to area, just as in the continuous case.  The probability $p_X(2)$ is equal to the area of the rectangle centered over the value 2.  The probability $P_X(2)$ that $X$ is less than or equal to 2 is equal to the sum of the areas of the rectangles centered at 2 and below ($2/6 = 1/3$).
+
+The R name for the discrete uniform distribution is dunif (in the extraDistr package).  You can also use the sample() function to generate random samples from a discrete uniform distribution.
+
+```{r}
+x.1 <- sample(6,1000,replace=TRUE)
+x.2 <- rdunif(1000,1,6)
+
+hist(x.1,freq=FALSE,breaks=seq(.5,6.5,by=1),main="")
+hist(x.2,freq=FALSE,breaks=seq(.5,6.5,by=1),main="")
+```
+
+Notice that the sample() function is not part of a quad.  It will only permit you to sample from integers or vectors of values and there is no equivalent probability, distribution or quantile function. 
+
+#### Parameters
+
+The discrete uniform distribution over a consecutive sequence of integers has two parameters: the minimum $a$ and the maximum $b$ of the sequence.  The probability function is then 
+$$
+p_X(x|a,b) = \left\{ \begin{array}{ll}
+   \frac{1}{b - a + 1} & \text{ for } x \in S \\
+   0 & \text{ otherwise. }
+   \end{array} \right.
+$$
+The distribution has mean $\mu = (a+b)/2$ and variance $\sigma^2 = [(b-a+1)^2-1]/12$.
+
+(Note how we wrote the probability function as a conditional probability given the values of the parameters $a$ and $b$.)
+
+#### 4. Your turn!
+
+Use the definitions of the expected value and variance of a discrete random variable and the rules of summation notation to compute the expected value and variance of $X$ when $X$ is uniformly distributed over the integers from $1$ to $7$. 
+
+### Bernoulli
+
+Reading: [Bernoulli Distribution](https://distribution-explorer.github.io/discrete/bernoulli.html)
+
+The Bernoulli distribution is equally as simple as the uniform distribution.  A variable that follows a Bernoulli distribution has a sample space $S$ that contains only two outcomes: $S = \{0,1\}$.  The outcomes are classified as "failures" and "successes," generally speaking, but can be used to describe any experiment in which only two things can happen (e.g., heads or tails, odd or even; remember the definition of a random variable is that it is a mapping of a sample space into the real numbers).
+
+R does not have a quad for the Bernoulli distribution because it is a special case of the Binomial distribution (see below).  
+
+#### Parameters
+
+The Bernoulli distribution has a single parameter $p = Pr(X=1)$, the probability of a success.  So the density function can be written as 
+$$
+p_X(x|p) = \left\{ \begin{array}{ll}
+    p^x (1-p)^{1-x} & \text{ for } x \in \{0,1\} \\
+    0 & \text{ otherwise.} 
+    \end{array} \right.
+$$
+
+The mean of the Bernoulli distribution is $\mu = p$ and its variance is $\sigma^2 = p(1-p).$
+
+#### 5. Your turn!
+
+Use the definitions of the expected value and variance of a discrete random variable and summation notation to show that the expected value of a Bernoulli distributed variable $X$ with parameter $p$ has mean $p$ and variance $p(1-p)$.
+
+### Binomial
+
+Reading: [Binomial Distribution](https://distribution-explorer.github.io/discrete/binomial.html)
+
+The binomial distribution represents the number of successes in a sequence of $N$ experiments (e.g. coin flips).  It is therefore the sum of $N$ [*independent and identically distributed*](https://en.wikipedia.org/wiki/Independent_and_identically_distributed_random_variables) (iid) Bernoulli variables.
+
+Think now about an ordered sequence of iid Bernoulli outcomes.  For $N=7$ total experiments (coin flips) we observe $\{1,0,0,1,0,1,1\}$ (4 "successes").  From the multiplication rule for independent events we know that the probability of getting exactly this sequence in exactly this order is $p(1-p)(1-p)p(1-p)pp = p^4(1-p)^3$.  
+But the binomial distribution is not concerned with the probability of the sequence: it is concerned with the probability of getting some number of successes $n$ in the sequence.  So its sample space is $S=\{0,1,2,\ldots,N\}$.  For the sequence of $N=7$ outcomes above the binomial variable $X=4$.
+
+Each sequence in which $X=4$ has exactly the same probability: $p^4(1-p)^3$.  So we need to add up all such probabilities for all the sequences that have exactly 4 successes.  The way to think about this is to look at the 7 locations in the sequence in which the successes can occur.  We are sampling those locations without replacement (two outcomes can't happen as a result of a single Bernoulli experiment), and we know that the number of ways we can draw 4 unique locations from the set of 7 is $\binom{7}{4} = 35$.  Therefore there are 35 sequences, each occurring with probability $p^4(1-p)^3$.  Add up all 35 and the probability of $X=4$ is $$p_X(4|N=7,p) = 35 p^4 (1-p)^3.$$
+
+#### Parameters
+
+The binomial distribution has two parameters: $N$ is the length of the sequence and $p$ is the probability of a success on each trial in the sequence.  The probability function is
+$$p_X(x|N,p) = \binom{N}{x} p^x (1-p)^{N-x},$$
+for $x \in \{0,1,\ldots,N\}$ and 0 otherwise.  The binomial distribution has mean $\mu = Np$ and variance $\sigma^2 = Np(1-p)$.
+
+The R quad for the binomial distribution is based on the root "binom."  So for example, if $N=7$, $p=0,5$ and $X=4$,
+```{r}
+dbinom(4,7,.5)
+# Compare to
+35 * .5^4 * .5^3
+```
+
+The dbinom(x,N,p) function generates the values that you will find in a [binomial table](https://uwf.edu/media/university-of-west-florida/colleges/cse/departments/mathematics-and-statistics/documents/student-resources/Binomial-Tables-1.pdf), which you have probably used before.  
+
+#### The Bernoulli distribution, revisited
+
+You should now be able to recognize that the Bernoulli distribution is the special case of the binomial distribution when $N=1$.  To compute Bernoulli quantities you will use the binom quad with $N=1$:
+
+```{r}
+dbinom(1,1,.4) # probability of 1 success in 1 experiment with p=.4
+```
+
+The sum of $N$ Bernoulli($p$) variables is distributed as a binomial with parameters $N$ and $p$.  We can easily demonstrate this with a simulation.
+
+```{r}
+bignum <- 10000
+# Generate a large number of binomial values with N=10 and p=.4
+bin.sim <- rbinom(bignum,10,.4)
+
+# Generate a large number of Bernoulli p=.4 values in groups of 10 and add them
+x <- matrix(rbinom(10*bignum,1,.4),ncol=10) # stick the 0,1 values in a matrix with 10 columns
+Ber.sim <- rowSums(x) # the sum of each row is a Binomial(10,.4) variable
+
+# Contrast the relative frequency distributions with the probability distribution function
+contrast <- rbind(
+hist(bin.sim,breaks=seq(-.5,10.5,by=1),plot=FALSE)$counts/bignum,
+hist(Ber.sim,breaks=seq(-.5,10.5,by=1),plot=FALSE)$counts/bignum,
+dbinom(0:10,10,.4))
+
+row.names(contrast) <- c("Binomial","Summed Bernoulli","True Probability")
+t(contrast)
+```
+
+You can see that there are small variations in the relative frequencies for the two simulations, and these frequencies differ slightly from the true probabilities of each binomial outcome.  These variations are due to sampling variability.
+
+### Poisson
+
+Reading: [Poisson Distribution](https://distribution-explorer.github.io/discrete/poisson.html)
+
+Imagine what might happen to the binomial distribution as $N$ gets very, very large and $p$ gets very, very small.  A situation like this often arises in quality control: you have a very large batch of manufactured items (widgets) but the manufacturing process is pretty good, so that the probability of any widget being defective is very small.  The number of defects we observe can be modeled with a Poisson distribution.
+
+The Poisson distribution is used to describe the number of rare events that occur in a fixed period of time or in a fixed region of space.  If $X$ follows a Poisson distribution then its sample space $S=\{0,1,2,\ldots\}$ is countably infinite. The iid assumption of the binomial distribution still must hold: the events we are counting are independent from each other and the probability of each event (the rate at which they occur) is constant.
+
+In the social sciences and psychology the Poisson distribution is used to model data such as the number of times someone is arrested in a year, the number of times a person overdoses in a year, the number of temper tantrums a child throws in a week at school, etc.  Note that this kind of count data is obtained for a fixed period of time.  We often analyze these kinds of data with Poisson regression models, which we will not have time to cover in this class.
+
+#### Parameters
+
+The Poisson distribution has probability function
+\[
+p_X(x|\lambda) = \left\{ 
+   \begin{array}{ll} 
+    \frac{\lambda^x e^{-\lambda}}{x!} & x = 0, 1, 2, \ldots \\
+    0 & \text{ otherwise.} 
+    \end{array}\right.
+\]
+The single parameter $\lambda>0$ is called the rate parameter and $e$ is [Euler's number](https://en.wikipedia.org/wiki/E_(mathematical_constant)) (2.71828..., the basis of the natural log ln(); oddly, this number was first identified by Bernoulli, not Euler).  The mean of the Poisson distribution is $\mu = \lambda$ and the variance is $\sigma^2 = \lambda$. 
+
+(Random observation: When $N$ for the binomial distribution gets very large and $p$ gets very small, to arrive at a Poisson distribution they both must do so in a way that the binomial mean $Np$ neither goes to 0 nor goes to infinity, it has to go to $\lambda$.  Hence $\lambda$ is the mean of the Poisson distribution in exactly the same way that $Np$ is the mean of the binomial distribution.)
+
+The R quad that generates the Poisson quantities uses the root "pois."  To see the connection between the Poisson distribution and the binomial distribution we can look at the binomial probabilities as $N$ grows and $p$ shrinks and compare those distributions to the Poisson.  Consider the Poisson distribution with rate $\lambda=5$:
+
+```{r}
+lambda <- 5
+
+# Set the event frequencies for which probabilities are to be computed
+x <- seq(0,25)
+
+# Compute the Poisson probabilities with dpois and plot the probability function
+f<-dpois(x,lambda)
+plot(x,f,xlab="Number of Events",
+     type="p",ylab="Probability")
+segments(x0=x,y0=0,x1=x,y1=f)
+```
+
+(Remember to not plot the probability function as a line because the probabilities of noninteger values is zero.)
+
+Now let's generate the probability function for several binomial distributions for which $Np=5$.
+
+```{r}
+# Set the binomial N parameter values
+N <- c(10,20,30,1000)
+
+# Set the binomial p parameter values in such a way that Np is always equal to lambda
+p <- lambda/N 
+
+# Plot the exact/true Poisson distribution as red circles
+plot(x,f,pch=16,col='red',ylim=c(0,.25),
+     xlab="Number of Events",ylab="Probability")
+segments(x0=x,y0=0,x1=x,y1=f)
+
+# Add the binomial probabilities with different plot points
+for (i in 1:length(N)) 
+   points(0:N[i],dbinom(0:N[i],N[i],p[i]),pch=as.character(i),cex=.75)
+
+# Add a legend to the plot
+legend("topright",legend=c("N",as.character(N)),
+       pch=c("",as.character(1:length(N))))
+```
+
+In this figure it is clear that the binomial(N,p) distribution very closely approximates the Poisson($\lambda$) distribution for $Np = \lambda$ even when $N$ is small (30) relative to the "infinity" (1000) that $N$ is supposed to be for this to work.  When $N=1000$ all the points "4" are equal to the red circles.
+
+### Tabled Distributions
+
+Reading: [Categorical Distributions](https://distribution-explorer.github.io/discrete/categorical.html)
+
+The last of the discrete distributions we need to talk about are "tabled" (categorical) distributions.  These are distributions that have no functional form but arise from a tabulation of relative frequencies.  Consider for example the GSS data and the relative frequency distribution of health ratings, which range from 1 to 4 that we used to compute the expected value and variance of the health ratings.
+
+```{r}
+table(data$health)/sum(table(data$health))
+```
+
+These relative frequencies are the probabilities of the random variable $X$ that represents the reported level of health. That is, 
+\[
+p_X(x) = \left\{ \begin{array}{ll}
+ 0.32 & x=1 \\
+ 0.42 & x=2 \\
+ 0.19 & x=3 \\
+ 0.07 & x=4 \\
+ 0 & \text{ otherwise.} \end{array} \right.
+\]
+ 
+If I sample at random a respondent from the data, these are the probabilities (relative frequencies) with which I will see the four possible outcomes.  
+
+#### Parameters
+
+A tabled distribution's parameters are simply the individual probabilities of each outcome.  The mean of the distribution is $\mu = \sum_{x \in S} x p_X(x)$ and its variance is $\sigma^2 = \sum_{x \in S} (x - \mu)^2 p_X(x)$.  Note the similarities between these expressions and those for the sample mean and variance.
+
+## Continuous Distributions
+
+There are 5 continuous distributions that you must be able to identify and work with in statistics and data analysis.  These are:
+
+1. Uniform
+2. Normal
+3. Student's t
+4. $\chi^2$
+5. $F$
+
+### Uniform
+
+Reading: [Uniform Distribution](https://distribution-explorer.github.io/continuous/uniform.html)
+
+The continuous uniform distribution only differs from the discrete uniform distribution in that the random variable $X$ takes on values in an interval rather than over discrete points. 
+
+Examples of continuous uniform distributions include the spinner example above and the times at which Poisson events occur in a fixed interval of time.  
+
+The uniform distribution is particularly important in statistics.  It is used (by R and other packages) to generate random samples from a wide range of distributions through the use of the [inversion method](https://en.wikipedia.org/wiki/Inverse_transform_sampling). It is also used as a default [prior](https://en.wikipedia.org/wiki/Prior_probability#Uninformative_priors) in Bayesian inference.  
+
+#### Parameters
+
+The general continuous uniform distribution has two parameters $a$ and $b$ where $-\infty < a < b < \infty$.  A uniformly distributed variable $X$ has support $S=[a,b]$.  (Whether we include the values of $a$ and $b$ in the sample space or not does not matter because of the continuity of $X$: the probability that $X$ takes on exactly one of the two values is zero and so we might also write $S=(a,b)$ without changing anything.)  When $a=0$ and $b=1$ we say that $X$ follows a *standard* uniform distribution.
+
+The probability density function (pdf) of $X$ is
+\[
+f_X(x|a,b) = \left\{ \begin{array}{ll}
+\frac{1}{b-a} & x \in [a,b] \\
+0 & \text{ otherwise.} \end{array} \right.
+\]
+The distribution has mean $\mu = \frac{a + b}{2}$ and variance $\sigma^2 = \frac{(b-a)^2}{12}$.   
+
+You might see probability or density functions written as
+$$
+f_X(x|a,b) = \frac{1}{b-a}\mathcal{I}(x \in [a,b]).
+$$
+The function $\mathcal{I}(s)$ is called an *indicator function*.  It equals 1 when the statement $s$ is true and 0 when it is false.  This is a convenient shorthand way of making sure that a density function is zero in all the right places, and you don't have to add the 0 otherwise to the probability or density functions.
+
+If $a=0$ and $b=1$ then $f_X(x) = 1$ for all $x \in [0,1]$, or $f_X(x) = \mathcal{I}(0 \le x \le 1)$ and $\mu=1/2$ and $\sigma^2 = 1/12$.
+
+In R we calculate the uniform distribution quantities with the unif quad. The standard uniform distribution is called by not passing the unif functions any parameter values (e.g., runif()).
+
+To demonstrate the utility of the runif() function, this chunk of code shows another way to simulate a binomial random variable.
+
+```{r}
+# Simulate a binomial random variable with parameters 10 and .7 with the standard uniform 
+# random variable
+bignum <- 10000
+N <- 10
+p <- .7
+
+# The probability of sampling a standard uniform value less than p=.7 is .7.
+
+# Generate a large number (bignum) of uniform deviates and keep track of which ones are
+# less than p=.7 (a success).  Store these records in a bignum x N matrix
+X <- matrix(runif(bignum*N)<p,ncol=N) # TRUE if runif < p
+
+# Sum the rows of the matrix to simulate a Binomial(N=10,p=.7) variable
+X <- rowSums(X) # add the Bernoulli observations in groups of N
+
+plot(table(X)/bignum,xlim=c(0,N),
+     ylab="Probability",xlab="Binomial Values")
+# Add true binomial probabilities
+points(0:N,dbinom(0:N,N,p),col='red') 
+```
+
+### Normal
+
+Reading: [Normal Distribution](https://distribution-explorer.github.io/continuous/normal.html)
+
+The normal distribution is the bell curve or Gaussian distribution.  It is ubiquitous, [arising across most physical/natural systems in one form or another.](https://en.wikipedia.org/wiki/Normal_distribution#Occurrence_and_applications).  
+
+The reason for this ubiquity is related to the fact that what we observe in many of these systems is a result of the accumulation of many small perturbations.  
+
+Consider the number of Skittles in a 500g bag.  The Skittles bounce against each other in the manufacturing process, bounce around the sides of the containers and the mechanisms that move them along, and bounce around inside the machinery in the packing phase.  The machinery itself is subject to bouncing and rattling, so it doesn't do exactly the same thing every time the Skittles bounce against it.  As the multitude of effects of these bouncing and rattling perturbations add up, the result is a normal distribution of the number of Skittles that make it into the 500g bag.  
+
+In nature these kinds of effects are larger and come from more sources, known and unknown.  The number of grains on a stalk of wheat is determined by the soil, the rain, the depth of planting, weeds and insects in the vicinity, the temperature, and so forth.  Once again adding these effects together, the number of grains turns out to be normally distributed.  
+
+Think now about the computations that we make for measures of central tendency and dispersion.  The most common of these, the mean and variance, are sums.  Because we are adding up things, the sampling distributions of these statistics tend to the normal distribution as the sample gets large (as we add up more things).  This fact is reflected in the Central Limit Theorem, which we will talk about later.
+
+The normal distribution provides the basis for the $z$-test, which is used to test hypotheses about sample means and correlation coefficients, among other statistics, under certain assumptions.
+
+Because the binomial is the sum of N Bernoulli random variables, you might suspect that the binomial distribution approaches the normal distribution as $N$ grows, and you would be correct to do so. 
+
+#### Parameters
+
+The normal distribution has two parameters, $\mu$ and $\sigma^2$, the mean and variance.  The sample space of a normally distributed variable $X$ is $S = (-\infty,\infty)$: $X$ may take on the value of any real number.  The pdf of the normal distribution is 
+$$
+f_X(x|\mu,\sigma^2) = \frac{1}{\sqrt{2 \pi \sigma^2}} e^{-\frac{1}{2}\left(\frac{x-\mu}{\sigma} \right)^2}
+$$
+for all real values of $x$.  The value of $e$ is Euler's number and $\pi$ is 3.1415..., which should be well known to you.  
+
+Note that the squared term in the exponent, $\frac{x-\mu}{\sigma}$, is a $z$-score, which we encountered in Foundations II.  Noting that the variance of $z$-scores is 1, the density
+$$
+f_Z(z) = \frac{1}{\sqrt{2 \pi}} e^{-\frac{1}{2}z^2}
+$$
+is the *standard normal density*, which has no parameters because it is implicitly assumed that $\mu_Z = 0$ and $\sigma_Z^2 = 1$.  
+
+R uses "norm" as the root of the quads for the normal distribution. The cumulative distribution and quantile functions pnorm() and qnorm() will be more important for this distribution because they will return the $p$-value and critical values for the $z$-test of the mean.
+
+The [Galton board or Quincunx](https://www.mathsisfun.com/data/quincunx.html) is a demonstration of how an accumulation of small perturbations (in this case, repeated Bernoulli trials) results in a normal distribution.  Because the sum of Bernoulli trials results in a binomial distribution, we can see that the resting location of a marble at the bottom of the board follows a binomial distribution, which approaches the normal distribution as $N$ grows.
+
+The following simulation demonstrates this behavior by plotting binomial probabilities on top of the normal density function.
+
+```{r}
+# Choose the values for the binomial N parameter
+N <- c(12,20,30,1000)
+
+# Set the mean and variance of the normal distribution
+mu <- 10
+sigma.2 <- 10
+
+# Choose values of p for each value of N that ensure that Np = mu
+p<- mu/N 
+
+# Select values along the x-axis for plotting
+z <- seq(mu - 4*sqrt(sigma.2),mu + 4*sqrt(sigma.2),length=200)
+
+# Plot the normal density
+plot(z,dnorm(z,mu,sqrt(sigma.2)),type='l',
+     ylim=c(0,.3),xlim=c(min(z),max(z)),col='orange',
+     ylab="Density",xlab="Values of Binomial X")
+colors <- c(rep("black",times=3),"purple")
+
+# Add binomial probabilities to the plot
+for (i in 1:length(N)) 
+points(seq(0,N[i]),dbinom(seq(0,N[i]),N[i],p[i]),
+       pch=i,col=colors[i])
+legend("topright",pch=1:length(N),legend=N)
+```
+
+The purple xs are the binomial probabilities and the orange curve is the normal density. Be careful: the norm quad assumes that you will be passing it $\sigma$ instead of $\sigma^2$, so if you call dnorm(x,mu,5) the variance is $5^2 = 25$ and 5 is the standard deviation.
+
+### Student's $t$
+
+Reading: [Student's $t$ Distribution](https://distribution-explorer.github.io/continuous/student_t.html)
+
+"Student" was the pseudonym of statistician [William Sealy Gosset](https://ieee-aess.org/post/blog/history-column-william-sealy-gosset-student), an employee of the Guinness Brewery in Dublin, Ireland.  There are several stories about why Gosset published his work under a pseudonym but the bottom line seems to be that Guinness didn't want their employees' names on published work, whatever the reason.  
+
+The $t$ distribution was published by Gosset in 1908, and Ronald Fisher later referred to the distribution as "Student's $t$" and there the name stuck.
+
+##### Parameters
+
+The $t$ distribution has one parameter $\nu > 0$ that is called the "degrees of freedom."  This parameter is almost always an integer.  The sample space of $T$ is infinite over all real numbers, $S=(-\infty,\infty)$.  The mean of the $t$ distribution is $\mu=0$ and its variance is $\sigma^2 = \nu/(\nu-2)$.  The pdf of the $t$ distribution is ugly and I won't bore you with it.
+
+As $\nu$ gets very large the $t$ distribution approaches the standard normal distribution with mean $\mu = 0$ and standard deviation $\sigma = 1$.  If $\nu=1$ the $t$ distribution is the same as a Cauchy distribution (and the mean and all other moments are no longer defined).
+
+(There is another distribution called a "non-central" $t$ for which $\mu \ne 0$.  When $\mu \ne 0$ the distribution is not symmetric; we won't say much about the noncentral $t$.)
+
+R uses the root "t" for the $t$ distribution quad.  The following block of code plots the $t$-distribution for increasing values of $\nu$.  The orange curve is the standard normal distribution.
+
+```{r}
+# Choose values of t for plotting
+t <- seq(-3,3,length=200)
+
+# Select the values of nu
+nu <- c(2,5,10,100)
+
+# Plot the t densities with these values of nu together with the normal density
+plot(t,dnorm(t),type='l',col='orange')
+for (i in 1:length(nu))
+  lines(t,dt(t,nu[i]),lty=i+1)
+legend("topright",legend=c("nu",as.character(nu)),
+       lty=c(NA,seq(2,length(nu)+1)))
+```
+
+When $N$ gets large, the variance of the $t$ distribution is approximately 1, leading to the standard normal distribution.
+
+### $\chi^2$
+
+Reading: Howell Ch 6 (6.1)
+
+The $\chi^2$ distribution describes a variable $X^2$ that is the sum of $N$ squared standard normal variables,
+$$ X^2 = Z_1^2 + Z_2^2 + \cdots + Z_N^2.$$
+Because all the terms in the sum are squared, and because the support of each $Z_i$ is the real line $\mathcal{R} = (-\infty,\infty)$, the support of $X^2$ is the positive real numbers $S = [0,\infty)$.  Note also that because the $\chi^2$ distribution is defined as the sum of other iid variables, it will approach the normal distribution as $N$ gets large.
+
+#### Parameters
+
+The $\chi^2$ distribution has a single parameter $N$, the number of squared standard normal variables in the sum. Because the elements of a $\chi^2$ variable are all positive, the support of the $\chi^2$ distribution is $S = [0,\infty)$, the positive real numbers.  The probability density function is
+\[
+f_X(x) = \dfrac{x^{N/2-1} e^{-x/2}}{2^{N/2}\Gamma(N/2)}.
+\]
+Its mean $\mu = N$ and its variance $\sigma^2 = 2N$.  
+
+R uses chisq as the root for the $\chi^2$ quad.  The following chunk of code plots the $\chi^2$ density function in orange on top of a relative frequency histogram of the sum of $N=5$ squared standard normal variables.
+
+```{r}
+# Set the chi-squared parameter N=5
+N <- 5
+
+# Define the range of chi-squared values
+x <- seq(0,N + 4*sqrt(2*N),length=200)
+
+# Set the number samples to obtain
+bignum <- 10000*N
+
+# Generate a large number of standard normal variates, square them and put them in a
+# bignum x N matrix.  Then add across the 5 columns to produce bignum chi-squared (5) 
+# deviates
+Z2 <- rnorm(bignum)^2
+X2 <- rowSums(matrix(Z2,ncol=N))
+
+# Plot the density and relative frequency histogram 
+hist(X2,freq=FALSE,breaks=100,main="",
+     xlab="Values of X^2",ylab="Density")
+lines(x,dchisq(x,N),col='orange')
+```
+
+I stated above that if you add up a bunch of iid variables the distribution of the sum will be normal if the number of terms in the sum is large.  The next chunk of code increases the value of the parameter $N$ to 100 and adds the normal density with mean $N$ and variance $2N$.
+
+```{r}
+N <- 100
+# Define the range of chi-squared values
+x <- seq(0,N + 4*sqrt(2*N),length=200)
+
+bignum <- 10000*N
+
+# Generate a large number of standard normal variates, square them and put them in a
+# bignum x N matrix.  Then add across the N columns to produce bignum chi-squared 
+# deviates with N degrees of freedom
+Z2 <- rnorm(bignum)^2
+X2 <- rowSums(matrix(Z2,ncol=N))
+
+# Plot the density and relative frequency histogram of the chi-squared distribution, and add
+# the normal distribution with mean $N$ and variance $2N$
+hist(X2,freq=FALSE,breaks=100,main="",
+     xlab="Values of X^2",ylab="Density")
+lines(x,dchisq(x,N),col='orange') # Here's where we call chisq
+lines(x,dnorm(x,N,sqrt(2*N)),col="purple")
+```
+
+Compare the two visualizations.  For $N=5$ the density is positively skewed.  For $N=100$ the density is unimodal and nearly normal.  The mean and variance of the normal distribution are equal to the $\chi^2$ mean and variance.
+
+#### Variances
+
+Remember that the sample variance $s^2 = \frac{1}{N-1} \sum_{i=1}^N (X_i - \overline{X})^2$.  This is a sum of squared values divided by $N-1$, and you might suspect that this statistic is related to a $\chi^2$ distribution.  You'd be right!  If $X$ follows a normal distribution with mean $\mu$ and standard deviation $\sigma$, then 
+\begin{eqnarray*}
+\frac{(N-1) s^2}{\sigma^2} & = & \frac{1}{\sigma^2} \sum_{i=1}^N  (X_i - \overline{X})^2 \\
+& = & \sum_{i=1}^N \frac{ (X_i - \overline{X})^2}{\sigma^2} \\
+& = & \sum_{i=1}^N \left(\frac{ X_i - \overline{X}}{\sigma} \right)^2 \\
+& = & \sum_{i=1}^N Z_i^2.
+\end{eqnarray*}
+This means that, under the conditions provided, $\frac{(n-1) s^2}{\sigma^2}$ follows a $\chi^2$ distribution with $N-1$ degrees of freedom.  (We lose a degree of freedom for using $\overline{X}$ instead of $\mu$ in the numerator of $s^2$.)
+
+This fact about the sample variance is the basis for ANOVA and other inferential tests of variance, but before we get too deep we need to talk about the $F$ distribution.
+
+#### 6. Challenge
+
+Construct the sampling distribution of $X^2 = \dfrac{(N-1) s^2}{\sigma^2}$ by taking samples of size $N$ from a normal distribution (with known variance $\sigma^2$), computing the variance $s^2$ of each sample, and finally by computing $X^2$ by multiplying the $s^2$s by $N-1$ and dividing by $\sigma^2$.  Plot the histogram of $X^2$ with the $\chi^2(N-1)$ density on top. (Make sure you set freq=FALSE as an option for the hist() function.)
+
+Then do it all again, but compute the variance of each sample using $\mu$ instead of $\overline{X}$.  On the histogram, draw the $\chi^2(N)$ distribution.  If you use $\mu$ instead of $\overline{X}$ you don't lose the degree of freedom.
+
+### $F$
+
+Reading: [The $F$ Distribution](https://mathworld.wolfram.com/F-Distribution.html)
+
+Suppose you have two independent $\chi^2$ random variables $X^2_1$ and $X^2_2$ with degrees of freedom parameters $\nu>0$ and $\delta>0$ respectively.  Then 
+$$
+F = \frac{X^2_1/\nu}{X^2_2/\delta}
+$$
+follows an $F$ distribution with $\nu$ and $\delta$ degrees of freedom.  
+
+Remember from above that if $X$ follows a normal distribution then $(N-1)s^2/\sigma^2$ follows a $\chi^2$ distribution with $N-1$ degrees of freedom.  If the $\chi^2$ variables in the $F$-ratio are derived from sample variances, then the ratio
+\begin{eqnarray*}
+F & = & \dfrac{(N_1-1)s_1^2/\sigma_1^2(N_1-1)}{(N_2-1)s_2^2/\sigma_2^2(N_2-1)} \\
+& = & \dfrac{s_1^2}{s_2^2} \dfrac{\sigma_2^2}{\sigma_1^2} 
+\end{eqnarray*}
+follows an $F$ distribution with $N_1-1$ and $N_2-1$ degrees of freedom.  Later we will try to test hypotheses about whether $\sigma_1^2 = \sigma_2^2$.  If this is true, then $F = s_1^2/s_2^2$ (assuming that $\sigma_1^2/\sigma_2^2 = 1$) will be the statistic we use for that test.
+
+#### Parameters
+
+The $F$ distribution parameters, $\nu$ and $\delta$, are called the numerator and denominator degrees of freedom respectively.  The density function is *super* ugly (I suppose its mom loves it) and I won't bother you with it.  Because $X^2_1/\nu$ and $X^2_2/\delta$ are both positive the support of $F$ is the positive real numbers: $S = [0,\infty)$.  The mean of the $F$ distribution is $\mu = \delta/(\delta - 2)$ for $\delta>2$ and variance 
+$$
+\sigma^2 = \frac{2 \delta^2 (\nu + \delta - 2)}{\nu(\delta-2)^2(\delta-4)}
+$$
+for $\delta>4$. If $\delta \le 2$ the mean does not exist.  If $\delta \le 4$ the variance does not exist.
+
+The R quad root for the $F$ distribution is f (ho-hum), and you need to tell it what the numerator and denominator degrees of freedom are, so (for example) to generate 100 variables from an $F$ distribution with 1 (numerator) and 10 (denominator) degrees of freedom you'd execute rf(100,1,10).  
+
+The following chunk of code simulates observations from the $F$ distribution by computing the sample variances of two samples drawn from two normal distributions, both with mean $\mu =0$ and variance $\sigma^2 = 1$.  The first sample size is $N_1 = 5$ and the second is $N_2 = 17$.  This means that the numerator and denominator degrees of freedom for the ratio of the two sample variances are $\nu = 4$ and $\delta = 16$, respectively.
+
+```{r}
+bignum <- 10000
+# Sample sizes:
+n.1 <- 5
+n.2 <- 17
+
+# Degrees of freedom (subtract 1):
+nu <- n.1 - 1
+delta <- n.2 - 1
+
+# Compute a bunch of variances for bignum samples
+num <- apply(matrix(rnorm(bignum*n.1,0,1),ncol=n.1),1,var) # numerator
+den <- apply(matrix(rnorm(bignum*n.2,0,1),ncol=n.2),1,var) # denominator
+
+# Because the population variances are equal there is no need to divide each sample variance 
+# by sigma^2, they cancel out (and are equal to 1 anyway).
+F.ratios <- num/den
+
+top <- ceiling(max(F.ratios)) # This is for plotting
+
+f<-seq(0,top,length=200)
+hist(F.ratios,freq=FALSE,breaks=seq(0,top,length=31),ylim=c(0,.75),
+     main="",xlab="F-ratio Values",ylab="Density") 
+lines(f,df(f,nu,delta)) # Here's where we compute the F density function
+```
+
+# Relationships Between Distributions
+
+Now you should have some appreciation for the fact that many distributions are linked together.  Some are special cases of another distribution, like the Bernoulli distribution being the same as a binomial distribution with $N=1$.  Some are limiting distributions, like the normal distribution being the limit of the Student's $t$ distribution when the degrees of freedom goes to infinity.
+
+To get a better feel for the links between distributions, the interactive online [Leemis chart](https://www.math.wm.edu/~leemis/chart/UDR/UDR.html) will let you browse through an extensive universe of distributions and their relationships to each other.  
+
+## 7. Your turn!
+
+Through this notebook I have simulated samples from various distributions in various ways and contrasted the relative frequency distributions of those simulated samples to the pdfs of their theoretical distributions.  See, for example, the $F$ distribution and the relative frequency distribution of the ratio of two sample variances, or the sum of squared standard normal variables and the $chi^2$ distribution .
+
+For this exercise, look at the [F distribution](https://www.math.wm.edu/~leemis/chart/UDR/PDFs/Exponential.pdf) on the Leemis chart.  You can see that this distribution is linked to both the $\chi^2$ distribution and the Student's $t$ distribution.  
+
+Suppose that a variable $T$ follows a Student's $t$ distribution with $N=5$ degrees of freedom. Simulate, following the steps above, a large number of observations from the $t(5)$ distribution.  Show, by constructing the relative frequency histogram for $T^2$, that $T^2$ follows an $F(1,5)$ distribution: 1 numerator and 5 denominator degrees of freedom.  Use my code (see the $\chi^2$ distribution code chunks) as a model, don't try to code this up from scratch yourself.
+
+> INSERT YOUR CODE HERE
+
+### 7a. Challenge
+
+Hover over the [exponential distribution](https://distribution-explorer.github.io/continuous/exponential.html) on the Leemis chart.  The exponential distribution has pdf
+$$
+f_X(x) = \left\{ \begin{array}{ll}
+   \frac{1}{\alpha} e^{-x/\alpha} & x \ge 0 \\
+   0 & \text{otherwise,} \end{array} \right.
+$$
+where $\alpha>0$ is the mean of the distribution and its variance is $\alpha^2$.  (If you are a cognitive student this is a good distribution to become familiar with; it's going to pop up a lot when you are dealing with response time distributions and when you're designing perceptual experiments.)
+
+Here are some facts about the exponential distribution:  
+
+1. If $\alpha=2$ then $X$ also follows a $\chi^2$ distribution with parameter $N=2$; that is, the density functions of the $Exp(2)$ and $\chi^2(2)$ are the same.
+2. The sum of $k$ iid exponential variables $\sum_{i=1}^k X_i$ follows a [gamma$(k,\alpha)$ distribution](https://en.wikipedia.org/wiki/Gamma_distribution).
+3. Suppose independent variables $X_i$ follow exponential distributions with parameters $\alpha_i$.  Then for the sample $X = \{X_1, \ldots, X_m\}$, the minimum $\min{X}$ follows an exponential distribution with mean $1/\sum_{i=1}^m (1/\alpha_i)$.    
+4. For two iid exponential variables $X_1$ and $X_2$, $X_1/(X_1 + X_2)$ follows a standard uniform $U(0,1)$ distribution.
+
+Verify some of these facts using the strategies presented above.  Generate a large number of observations from the exponential distribution using the rexp() command.  One of the arguments to this command is the *rate* $\lambda = 1/\alpha$.  So, if you want 10,000 samples with mean $\alpha=2$, execute rexp(10000,1/2).
+
+Once you have your observations, compute the new variables and plot the histogram together with the density of the distribution that those new variables should follow.  
+
+> INSERT YOUR CODE HERE
+
+# One Last Thing: QQ plots
+
+Reading: [QQ plots](https://en.wikipedia.org/wiki/Q%E2%80%93Q_plot)
+
+Exploratory data analysis (EDA) is the process you go through to familiarize yourself with your data before you start the difficult process of modeling it.  (Modeling includes inferential procedures like z-tests and t-tests, which are model-based.)  It includes examining descriptive statistics, cleaning your data of outliers, missing values, duplicates, etc., dimensionality reduction (which eliminates variables that are redundant or that have no predictive value), data visualization, and *distribution analysis*.  
+
+Distribution analysis refers to the attempt to determine how best to characterize the distribution from which your data were sampled.  Sometimes this is easy: a score on a true/false exam, for example, should come from a binomial distribution.  But sometimes it's not at all clear: the number of siblings a person has, for instance, could come from any unimodal, positively skewed distribution with sample space $S = \mathcal{N}$, the positive integers.
+
+Now that you have in your pocket the most common distributions encountered in statistical analysis, how might you use them to determine the best description of the population from which your samples were drawn?  An easy way to do this is a data visualization called a quantile-quantile (QQ) plot.
+
+A QQ plot has the quantiles of the theoretical (proposed) population on the x-axis and the sample quantiles on the y-axis.  We want the two sets of quantiles to match, so if we have a good guess about what the population might be the points of the QQ plot should fall on the identity line ($y=x$).  If the guess is poor, the points will not fall on this line, particularly in the tails of the distribution (the low and high quantiles), which may fall above or below the identity line.
+
+As an example, consider the siblings data.  This variable (call it $X$) is positive and integer valued, and could (only theoretically) take on any value from the set $\mathcal{N} = \{0,1,2,\ldots\}$.  So let's see how well a Poisson distribution accounts for the data.
+
+First, let's figure out what the Poisson rate parameter $\lambda$ might be.  Recall that the mean of the Poisson distribution is $\lambda$, so it would make sense to set the estimate of $\lambda$ equal to $\overline{X}$.
+
+```{r}
+# We use "hats" to indicate that a statistic is an estimate of of the thing with the hat over it
+lambda.hat <- mean(siblings) 
+```
+
+Now compute the quantiles of $X$ and the quantiles of the Poisson distribution with $\lambda = \hat{\lambda}$ and plot them.
+
+```{r}
+q.ranks <- seq(0,.95,by=.05) # which quantiles do we want?
+
+X.q <- quantile(siblings,q.ranks)
+Poisson.q <- qpois(q.ranks,lambda.hat)
+
+plot(Poisson.q,X.q,type="p",xlab="Poisson Quantiles",ylab="Data Quantiles")
+abline(0,1) # identity line
+```
+
+As you study the QQ plot, remember that quantiles are not always unique.  Because the sibling and Poisson random variables are discrete, there is more than one possible quantile for each rank, and more than one possible rank for each quantile.  This is why the points on the curve appear stacked at some quantiles.  
+
+Is the Poisson distribution a good choice for these data?  Probably not: the lower quantiles of the data are consistently smaller than those of the Poisson distribution, and the upper quantiles of the data are higher.  This pattern usually means that the data have higher variance than the theoretical distribution.
+
+```{r}
+cat("Data variance = ",var(siblings),", Poisson variance = ",lambda.hat)
+```
+
+Because the distributions are discrete, however, this QQ plot is very impoverished and doesn't show enough detail to make a good judgment.
+
+If we continued down this path, we would probably want to conduct a test of the Poisson model by performing a [$\chi^2$ *goodness of fit test*](https://www.jmp.com/en_us/statistics-knowledge-portal/chi-square-test/chi-square-goodness-of-fit-test.html).  We might have time to do that before the semester ends.
+
+## 8. Your turn!
+
+Pick one of your quantitative variables.  Which of the 10 distributions (or another) seems like it might have the right properties to serve as a model for this variable?  Construct the QQ plot and evaluate your choice following my code chunk above.
+
+# 9. Your turn!
+
+There's a lot of stuff in this notebook and it's ok not to have absorbed all of it.  (Really, it's ok!)
+You can always come back to get whatever you need later.
+
+Write a short paragraph describing what you have learned about the distributions of random variables.  Was anything surprising to you?  Is there anything you would like to know more about?  What do you think is going to be most useful to you as you analyze your own data?
+
+

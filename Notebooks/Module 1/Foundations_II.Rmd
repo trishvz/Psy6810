@@ -1,0 +1,759 @@
+---
+title: "Module 1 - Foundations II"
+author: "TVZ"
+output:
+  html_document:
+    df_print: paged
+  pdf_document:     
+    extra_dependencies:
+      hyperref:
+        - colorlinks=true
+        - urlcolor=blue
+  word_document: default
+urlcolor: blue
+editor_options:
+  markdown:
+    wrap: 80
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Upload the libraries used in this document
+library("ggplot2")
+library("ggVennDiagram")
+library("extraDistr")
+library("vtable")
+library("tinytex")
+library("reshape2")
+library("gt")
+```
+
+# Learning Objectives
+
+At the end of this part of Module 1 you should be able to:
+
+1. Define terms: 
+    - population vs. sample
+    - parameter vs. statistic
+    - experiment
+    - outcome
+    - elementary, complex, complementary and joint events
+    - mutually exclusive events
+    - exhaustive events
+    - probability
+    - sample space
+    - Venn diagram
+    - union and intersection
+    - marginal, joint and conditional probability
+    - sampling with and without replacement
+    - permutation
+    - combination and binomial coefficient
+2. Explain the concept of sampling variability and its implications for statistics.
+3. Define a sampling distribution.
+4. Construct appropriate sample spaces for given experiments.
+5. Compute the probabilities of equiprobable or other elementary events. 
+6. Connect Venn diagrams with set theory to identify the union of events and joint events.
+7. Use the basic axioms of probability and the theorems derived from them to compute the probabilities of unions, joint, and complementary events.
+8. Construct more complex outcomes from combinations of elementary events and compute their probabilities.
+9. State the difference between marginal and conditional probabilities.
+10. Use a Venn diagram to explain the concept of a conditional probability.
+11. Compute the probabilities of conditional events and determine if events are independent.
+12. Derive the multiplication rule for joint probabilities from the definition of conditional probability.
+13. Use the multiplication rule to compute the joint probabilities of independent events.
+14. Explain the difference between sampling with and without replacement.
+15. Use the Fundamental Counting Principle to compute the number of possible outcomes of combinations of multiple events.
+16. Describe the difference between a permutation and a combination.
+17. Compute the number of possible outcomes of sampling a fixed number of objects without replacement from a group.
+18. Compute the number of unique groups that can be sampled from a larger group.
+
+# A Special Note
+
+In this notebook, in addition to the "Your turn!" sections, I have added some "Challenges" (and will continue to do so).  These are harder problems that I don't expect you to be able to solve easily but I hope you will at least attempt one or two.  
+
+Because some of the material in this notebook is highly theoretical, there is less application to data and less to do in R.  If a "Your turn!" asks questions without asking for computations, please insert a chunk into your own notebook with a brief answer to those questions.
+
+# Reading in Data
+
+This module will continue using the GSS data described in Foundations_I (but not so much).
+
+```{r}
+data <- read.csv("GSS_1980.csv",header=TRUE)
+names(data) <- c("X","income","sibs","age","happy","healthy","youngen")
+age <- data$age # Pull out age into its own variable to save typing later
+data$X <- NULL
+```
+
+# Populations versus Samples
+
+Video: [Samples and populations](<https://www.khanacademy.org/math/statistics-probability/designing-studies/sampling-and-surveys/v/identifying-a-sample-and-population>)
+
+When we sample, we are taking a subset of a larger group of objects that we wish to measure. Suppose I want to know whether Indiana soybeans are larger than Ohio soybeans or vice versa. The populations that concern me are all the soybeans grown both in Indiana and in Ohio for a particular period, say the 1999 planting season. Clearly I will not be able to measure every individual (bean) in each population, even if I could persuade someone to give them all to me, unless I want to grow old doing so.
+
+Instead, I would have to take a sample from each population. I can measure the beans in each sample, and compute *inferential* statistics that will help me answer the question of whether Ohio or Indiana beans are bigger.
+
+In the first notebook I used a dataset from the General Social Survey. Because we were only interested in describing those data we pretended that they constituted a population. Now we need to recognize that these data were in fact a sample from the larger GSS dataset, and that the GSS dataset itself is a sample from the entire population of US residents.
+
+Associated with a population are a number of *parameters* that describe the characteristics of that population. For example, a parameter might tell me the mean length $\mu$ of a bean from Indiana. We typically denote population parameters by using greek letters ($\mu$, $\sigma$, etc.). Whenever you see something referred to using a Greek letter, you can be pretty sure that it has something to do with a population. By contrast, recall that any computation we perform on a dataset is a statistic. Statistics are distinguished from population parameters by using Roman letters ($\overline{X}$, $S$, etc.). The important difference between parameters and statistics is that while parameters are constant, statistics will change depending on the sample that we obtain.
+
+Table 1: Sample statistics paired with their corresponding population parameters
+
+| | Statistic | Parameter | 
+|---:|:---:|:---:|
+| Mean | $\overline{X}$ | $\mu$ |
+| Variance | $s^2$ | $\sigma^2$ |
+| Correlation | r | $\rho$ |
+
+### Your turn!
+
+Identify the population from which your data were sampled.  Is it "all humans"?  Or something more specific?  Think carefully about this one.  
+
+## Sampling Variability
+
+Readings:
+
+1. Howell Chapter 4 (4.1-4.2)
+2. [Sampling variability](<https://www.statisticshowto.com/sampling-variability/>)
+
+Video: https://www.youtube.com/watch?v=vcbMinm_1Q8
+
+Statistics are not constant. Each sample will have its own characteristics depending on the observations within that sample, characteristics that should be roughly similar to those of the population from which the sample was obtained. For instance, if the population mean Indiana bean length is $\mu = 0.5cm$, we might compute the mean bean length from a sample of 1000 Indiana beans to be $\overline{X}=0.45cm$. If we take a second sample of 1000 Indiana beans we might observe $\overline{X}=0.51cm$. Every sample of 1000 beans will have a sample mean $\overline{X}$ that differs from the population mean, but not by too much.
+
+Recall an important point from Foundations I: while a measurement $X_i$ characterizes an individual $i$, the mean $\overline{X}$ characterizes the sample. Try to think of statistics like $\overline{X}$ as a measurement of a group of observations in the same way that $X_i$ is a measurement of an individual.
+
+The variation in sample statistics that occurs over different samples is called *sampling variation*. Sampling variability will always be present when we compute statistics from samples drawn from a larger population. Even if by chance two statistics from two different samples are the same, it is important to remember that this is just a coincidence. Sampling variability is present nonetheless.
+
+Let's look at sampling variability by taking samples of ages from the GSS dataset. We will continue to treat the 873 observations as a population and take samples from it to simulate what might happen in the real world.
+
+```{r}
+N <- 30 # sample size
+age.1 <- sample(age,N)
+
+age.mean <- mean(age) # "population" mean
+age.1.mean <- mean(age.1) # sample mean
+
+cat("Mean of age = ",age.mean,"\n",
+    "Mean of N = ",N,"observations sampled from age =",age.1.mean)
+```
+
+The sample() function allows you to pull observations at random from a data vector.
+
+While the mean of the age variable is `r round(age.mean,2)` the mean of the sample is `r round(age.1.mean,2)`. Let's take a second sample.
+
+```{r}
+age.2 <- sample(age,N)
+age.2.mean <- mean(age.2)
+
+cat("Mean of second sample = ",age.2.mean)
+```
+
+The mean of this new sample is `r round(age.2.mean,2)`, which is again different from both the mean of the population (age) and the mean of the first sample (age.1). (Please remember that age is not a true population, we're only
+pretending!)
+
+You can rerun that last chunk of code over and over and will (almost) never get the same two sample means.
+
+### Your turn!
+
+Treat your dataset like a population.  Take random samples of a fixed size (small, if your data set is small) of one of your quantitative variables.  Compute the mean of each sample and keep it.  After you've taken a lot of samples, plot the histogram of the means that you computed.  Compare the histogram of the means with the histogram of the original variable.
+
+```{r}
+# Here's some code to get you started
+# num.samples <- 10000 # a big number
+# N <- 10 # sample size, a small number
+
+# sample.mean <- vector() # this initiates a variable to store the mean values
+
+# There are lots of prettier ways to do this, but never underestimate the utility and 
+# ease of a nice "for" loop
+# for (i in 1:num.samples) 
+#   sample.mean[i] <- mean(sample(variable,N,replace=FALSE))
+```
+
+## Sampling Distributions
+
+Readings: 
+
+1. Howell Chapter 4 (4.2)
+2. [Sampling distributions](https://www.statisticshowto.com/probability-and-statistics/sampling-in-statistics/sampling-distribution/)
+
+Video:
+<https://www.khanacademy.org/math/statistics-probability/sampling-distributions-library>
+
+The histogram of the sample means you just constructed is called a *sampling distribution*.  In particular, it is a sampling distribution of the mean $\overline{X}$.  Every new sample *of fixed size* $N$ taken from a population with fixed parameters (e.g. $\mu$) will have a different sample mean $\overline{X}$. Each of those samples will have other statistics (such as the sample median, variance, range, etc.) that are also exhibit sampling variability: differences from sample to sample.
+
+Taking the view that a sample statistic is a group-level measurement, a measurement of a sample rather than of an individual within that sample, we can talk about distributions of those statistics in the same way that we talked about frequency distributions of the observations within a sample or population.
+
+Let's construct an *estimate* of the sampling distribution of the mean for the age variable assuming a fixed sample size of $N=30$. We will return to the issue of estimating this distribution below.
+
+```{r}
+# This is the variable that we'll use to store the values of the sample mean:
+age.means <- vector()
+# Pick a big number for the number of samples to draw
+n.samples <- 10000 
+# Remember that the sample size is 30 from above.  
+# Note also that N is not the same as n.samples.
+# N <- 30 
+
+for (i in 1:n.samples)
+  age.means[i] <- mean(sample(age,N))
+
+# Plot the frequency distribution of the sample means
+ggplot(data=NULL,aes(x=age.means)) + 
+  geom_histogram(binwidth=1,color="black",fill="white") + 
+  labs(title="Frequency Distribution", y="Frequency", x="Sample Means") + 
+  geom_vline(xintercept=mean(age), color="red") + 
+  geom_text(x=50,y=750, label=paste("Population Mean = ",round(mean(age),2),sep=''))
+```
+
+You can see that the frequency distribution of the sample means is unimodal, roughly bell-shaped and centered between 40 and 50 years. The vertical red line is located at the "population" mean of the age variable $\mu$ = `r round(mean(age),2)`.
+
+```{r}
+mean.mean <- mean(age.means)
+sd.mean <- sd(age.means)
+
+cat("Mean =",round(mean.mean,2),"\nStandard deviation =",round(sd.mean,2))
+```
+
+The mean value of the sample means is `r round(mean.mean,2)`. We can contrast this value with the population parameter $\mu$ = `r round(mean(age),2)`. These values are very very close, and this is not a coincidence. This is a demonstration of the (weak) [*Law of Large Numbers*](https://www.britannica.com/science/law-of-large-numbers). As the sample size $N$ gets larger and larger, the sample mean $\overline{X}$ will be closer and closer to the population mean $\mu$.
+
+We will talk about this phenomenon more later when we present the Central Limit Theorem.
+
+The means shown in the histogram demonstrate the range of sample means that we might expect to see for samples of size $N=30$ from the age population.
+
+### Your turn!
+
+By sampling repeatedly from one of your variables, construct the sampling distribution of the standard deviation $s$ for two different sample sizes.  If you have enough measurements, make one of the sample sizes large, like 50 - 100.  If not, you can use the age dataset we've been using here.  Plot the histograms of the two sampling distributions.  What differences do you observe between the two distributions?
+
+> INSERT YOUR CODE HERE
+
+# Probability and Distributions
+
+Readings:
+
+1. Navarro [Chapter 9](https://learningstatisticswithr.com/book/probability.html)
+2. Howell Chapter 5
+3. Lane et al. [Probability](https://www.onlinestatbook.com/2/sampling_distributions/sampling_distributions.html)
+
+Video: https://www.khanacademy.org/math/statistics-probability/probability-library
+
+Up to this point we have focused on descriptive statistics.  Having introduced the concept of sampling variability we can begin to think about inferential statistics: how we make inferences about data (populations) that we don't have given the sample of data that we do have.
+
+I hope that you are getting comfortable with uncertainty: the variability that we see in measurements and also the variability that we see in statistics and sampling distributions like that of the sample mean. Quantifying variability and uncertainty is the domain of probability theory, and the heart of inferential statistics is probability.  Probability theory is what allows us to make statements about populations on the basis of sample statistics.
+
+In the remainder of this notebook we're going to talk about probability: how to think about it, how to compute it, and probability distributions (which are closely related to the frequency distributions you have already encountered).
+
+## Basic Vocabulary
+
+Consider tossing a coin. Terms to know when talking about probability include:
+
+1.  The coin coming up heads ($H$) or tails ($T$) is an *event*.
+2.  Tossing the coin is called an *experiment*.
+3.  If the coin is tossed many times, the sequence of observations
+    $\{H,T,T,H,H,\ldots\}$ is a *joint event*.
+4.  The set of possible outcomes $S=\{H,T\}$ is called the *sample space* of the
+    experiment.
+
+Recall in Foundations I that we made a distinction between a set of measurements $\{X_1, X_2, \ldots, X_N\}$ and the set of possible values for each $X_i$ $\{x_1, x_2, \ldots, x_m\}$. Observing that $X_i = x_j$ for some individual $i$ and a value $x_j$ is an event. The act of measuring $X_i$ is an experiment. The dataset $\{X_1, X_2, \ldots, X_N\}$ is a joint event, and the set of possible values $\{x_1, x_2, \ldots, x_m\}$ is the sample space $S$ for the variable $X$.
+
+Write the sample space $S$ for a variable $X$ as $S = \{E_1, E_2, \ldots, E_m\}$. Probability $Pr()$ is a *measure* assigned to events $E_i \in S$ such that these three axioms hold:
+
+1.  $0 \le Pr(E_i) \le 1$
+2.  $Pr(S) = 1$, and
+3.  For *mutually exclusive events*,
+    $Pr(E_i \text{ or} E_j \text{ occurs}) = Pr(E_i) + Pr(E_j)$.
+
+An axiom is a statement that we take to be true without questioning it. Axiom 1 defines a probability measure to be a number between 0 and 1.  This measure is not entirely arbitrary; it is chosen for mathematically convenient reasons.  There are other probability measures that you may have encountered: percentages between 0 and 100 (the chance of rain) or odds from 0 to infinity (the odds your horse wins a race).
+
+Axiom 2 states that the sample space contains all possible outcomes; nothing is left out except the events that are impossible.  If you roll a traditional 6-sided die with spots 1-6 on each face the possible outcomes are each of the six faces.  The die can't balance on a corner, and you will never see a number of spots that is greater than 6.  These impossible events are not included in the sample space but all possible events are.  This means that the probability of the sample space $S$ is equal to 1: something has to happen and that something must be listed in $S$..
+
+Axiom 3 defines how to compute the probability of two or more mutually exclusive events.  Mutually exclusive events cannot occur at the same time. The outcome of a coin flip can't be both heads and tails. A number can't be both odd and even.  This means that if we wanted to know the probability of rolling a 1 or a 6 with a 6-sided die, we would just add the probabilities of 1 and 6.  
+
+## Computational Operations
+
+Video: [Intersection and union of sets](https://www.khanacademy.org/math/statistics-probability/probability-library/basic-set-ops/v/intersection-and-union-of-sets)
+
+Using the axioms we can derive how probability computations are performed.  We will make use of three basic set operations.  To understand them consider two sets (or variables) $A$ and $B$. The operations are
+
+1.  Union (or): $A \cup B$
+2.  Intersection (and): $A \cap B$
+3.  Complement (not): $\overline{A}$
+
+The union of two events means that either $A$ or $B$ or both occur.  The intersection of two events means that both $A$ and $B$ occur together.  The complement of an event $A$ means that the event $A$ does not occur. 
+
+Consider an experiment consisting of one roll of a fair 6-sided die. The term "fair" means that the die is uniformly weighted so that the probabilities of each possible number of dots coming up are equal. The sample space of the experiment is $S=\{1,2,3,4,5,6\}$, where the probability of each possible outcome is $1/6$. We can talk about more complicated events by arranging the *elementary events* $E_i$ in the sample space into *compound events* that are more complex and interesting.
+
+For example, if we roll a fair die the outcome could be an odd or even number of spots. Define the compound events $O=\{1,3,5\}$ (an odd number), $E=\{2,4,6\}$ (an even number), and $T=\{3,6\}$ (divisible by 3). Using the third axiom above, we can see that the probability of an odd number is $Pr(O) = Pr(1) + Pr(3) + Pr(5) = 3(1/6) = 1/2$. It should be clear that $Pr(O) = Pr(E)$. Also the probability that the number is divisible by 3 $Pr(T) = Pr(3) + Pr(6) = 2(1/6) = 1/3$.
+
+We can now address questions such as: 
+
+1. What is the probability that the outcome is an even number or divisible by 3? Noting that the event $E \cup T = \{2,3,4,6\}$, we write this as $Pr(E \cup T) = 4(1/6) = 2/3$.
+2. What is the probability that the outcome is both an even number and divisible by 3? This event can be written $E \cap T = \{6\}$, so $Pr(E \cap T) = 1/6$. 
+3. What is the probability that the outcome is not divisible by 3? We write this event as $\overline{T}$ or $T^C$, and $\overline{T} = \{1,2,4,5\}$, and $Pr(\overline{T}) = 4(1/6) = 2/3$.  
+
+From the axioms above we can prove three additional properties of the probability measure that will be critical for evaluating the probabilities of compound events. These are: 
+
+1. $Pr(\emptyset) = 0$ 
+2. $Pr(\overline{A}) = 1 - Pr(A)$ 
+3. $Pr(A \cup B) = Pr(A) + Pr(B) - Pr(A \cap B)$
+
+Property 1 comes from the second axiom, which states that $Pr(S) = 1$. A probability of 1 means the event is certain, and $Pr(S)=1$ means that whatever happens must be listed as a possibility in the sample space. Because something must happen, the empty set $\emptyset$ is the complement to the sample space. If the sample space has probability 1 then the empty set has probability 0.
+
+Property 2 is related to Property 1. The union of an event and its complement must be the sample space, $A \cup \overline{A} = S$, the event $A$ either happens or something else that is not $A$ happens. This means
+$Pr(A \cup \overline{A}) = Pr(S) = 1$. Because $A$ and $\overline{A}$ are mutually exclusive, $Pr(A \cup \overline{A}) = Pr(A) + Pr(\overline{A}),$ so it must be the case that $Pr(\overline{A}) = 1 - Pr(A)$.
+
+You may already be familiar with the concept in Property 3. The probability of the union of two events is equal to the sum of the probabilities of each event minus the probability of their intersection. This is usually demonstrated with a Venn diagram.
+
+```{r echo=FALSE}
+# Construct a Venn Diagram with arbitrary data and color and label the regions appropriately
+ggVennDiagram(list(T = c(0,1,2,3,6,9), E = c(2,4,6)),label="none",category.names = c("","")) + 
+  theme(legend.position = "none") + 
+  scale_fill_gradient(low="red",high = "yellow") + 
+  geom_text(aes(x = 0, y = 5.5, label = "E and not T = {2,4}"), size = 5, color = "black") +
+  geom_text(aes(x = 0, y = -1.5, label = "T and not E = {3}"), size = 5, color = "black") +
+  geom_text(aes(x = 0, y = 1.5, label = "E and T = {6}"), size = 5, color = "black") + 
+  annotate("rect", xmin = -Inf, xmax = 5, ymin = -Inf, ymax = Inf,
+           color = "black", fill = NA, linewidth = .5) + 
+  geom_text(aes(x = 0, y = -5, label = "not E and not T = {1,5}"), size = 5, color = "black") + 
+  geom_text(aes(x = -5.5, y = 9, label = "S"), size = 7, color = "black") +
+  geom_text(aes(x = 3.5, y = 7, label = "E"), size = 7, color = "black") +
+  geom_text(aes(x = -3.65, y = -3, label = "T"), size = 7, color = "black") 
+```
+
+The red circle indicates the set $E=\{2,4,6\}$ and the yellow circle the set $T=\{3,6\}$. The probability of event $E$ is $1/2$ and of $T$ is $1/3$. These circles are embedded in the sample space $S$, which includes the outcomes that are neither in set $E$ nor $T$: $\overline{E} \cap \overline{T} = \overline{E \cup T} = \{1,5\}$.
+
+Think of the probabilities of these events as the areas within the region $S$, which has area 1. We want to compute the area of the region $T \cup E$. If we add the areas for $E$ and $T$ together, $1/2 + 1/3 = 5/6$. However, that sum has the area of $E \cap T$ added in twice, once for $E$ and once for $T$. We want instead the areas $E \cap \overline{T}$, $E \cap T$, and $T \cap \overline{E} = 2/6 + 1/6 + 1/6 = 4/6$.
+
+Noting that $E = (E \cap \overline{T}) \cup (E \cap T)$ and $T = (\overline{E} \cap T) \cup (E \cap T)$, it should be clear that $Pr(E \cup T) = Pr(E) + Pr(T) - Pr(T \cap E)$, subtracting off the extra crescent-shaped piece representing $T \cap E$.
+
+If you find yourself getting lost in the notation, just remember that we are adding and subtracting the jigsaw-like pieces of the Venn diagram.  You can recover all these properties by putting pieces of the diagram together.
+
+## Application to GSS data
+
+I'll examine two variables in the GSS dataset, respondent age and endorsements of the sentiment that younger people should be taught to listen to their elders (youngen=1, which I'll call Att for attitude). Let's split the age variable according to whether the respondent is younger than 50 or not.
+
+```{r}
+# dcast is in the reshape2 package and tab_spanner 
+# and gt are in the gt package.
+# This chunk uses a "pipe," "|>", to pass the output 
+# of one function to another 
+Young <- data$age<50
+Att <- data$youngen
+
+# Tabulate the results
+x<-dcast(as.data.frame(table(Young,Att)),
+         Young~Att,value.var="Freq") 
+y_columns <- names(x)[-1]
+gt(x) |> tab_spanner(label="Att",columns=all_of(y_columns))
+```
+
+There are $N=873$ observations in the dataset. We can use Boolean operators in R to compute the probabilities associated with the young/old and sentiment endorsement variables.  Use the frequencies in the table above to guide and check your results.
+
+```{r}
+# "Marginal" Probabilities
+# Pr(Young) = (215+434)/873
+p.y <- mean(Young==TRUE)
+# (215+434)/873 # Check
+
+# Pr(Att=1) = (122 + 215)/873
+p.g <- mean(Att==1)
+# (122 + 215)/873 # Check
+
+# "Joint" probabilities (and)
+# Pr(Young and Att) = 215/873
+p.yag <- mean(Young==TRUE & Att==1)
+# 215/873 # Check
+
+# Pr(not Young and Att) = 122/873
+p.nyag <- mean(Young==FALSE & Att==1)
+# 122/873 # Check
+
+# Pr(Young and not Att) = 434/873
+p.yang <- mean(Young==TRUE & Att==2)
+# 434/873 # Check
+
+# Pr(not Young and not Att) = 102/873
+p.nyang <- mean(Young==FALSE & Att==2)
+# 102/873 # Check
+
+# "Union" of event (or)
+# Pr(Young or Att) = (122 + 215 + 434)/873
+# Note that the "|" Boolean operator means "or" and not "conditioned on"!
+p.yog <- mean(Young==TRUE | Att==1)
+# (122 + 215 + 434)/873 # Check
+
+# Pr(not Young or Att) = (122 + 215 + 102)/873
+p.nyog <- mean(Young==FALSE | Att==1)
+# (122 + 215 + 102)/873 # Check
+
+# Pr(Young or not Att) = (215 + 434 + 102)/873
+p.yong <- mean(Young==TRUE | Att==2)
+# (215 + 434 + 102)/873 # Check
+
+# Pr(not Young or not Att) = (122 + 102 + 434)/873
+p.nyong <- mean(Young==FALSE | Att==2)
+# (122 + 102 + 434)/873 # Check
+```
+
+These computations result in the following table of joint probabilities:
+
+
+|   | Att=1  | Att=2 | Young |
+|:---|---:|---:|---:|
+| Young = TRUE | `r p.yag` | `r p.yang`  | `r p.y`|
+| Young = FALSE| `r p.nyag` | `r p.nyang` |`r 1 - p.y`|
+|_Att_| `r p.g` | `r 1 - p.g` |
+
+Note the column labeled _Young_ and the row labeled _Att_.  The values here are called the *marginal* probabilities, and are the *marginal* probabilities that (e.g.) Young=TRUE.  (We call them marginal probabilities because they appear in the margins of the joint probability table.  Statisticians are not known much for their creativity.)  These marginals arise as a result of another theorem about probability, called the *Law of Total Probability*.  For two events $A$ and $B$, the Law of Total Probability says 
+$$Pr(A) = Pr(A \cap B) + Pr(A \cap \overline{B}).$$ 
+More generally, if we have $M$ mutually exclusive events $E_i$, $i=1,2,\ldots,M$ that are *exhaustive*, so that 
+$$E_1 \cup E_2 \cup \ldots \cup E_M = S,$$ 
+then 
+$$Pr(A) = \sum_{i=1}^M Pr(A \cap E_i).$$
+
+(The set $E=\{E_1, \ldots, E_M\}$ is called a *partition* of $S$.) 
+
+We can also construct a table of the probabilities of the union of the Young and Att events:
+
+|   | Att=1  | Att=2 |
+|:---|:---:|:----:|
+| Young = TRUE | `r p.yog` | `r p.yong`  |
+| Young = FALSE| `r p.nyog` | `r p.nyong` |
+
+A union of probabilities table is less useful than a joint probabilities table, but we can now demonstrate the truth of Property 3. The probability that Young=TRUE _or_ Att=1 is
+\begin{eqnarray*}
+Pr(\text{Young=TRUE} \cup \text{Att = 1}) & = & Pr(\text{Young=TRUE}) + Pr(\text{Att=1}) - Pr(\text{Young=TRUE} \cap \text{Att=1}) \\
+& = & 0.74 + 0.39 - 0.25 = 0.88.
+\end{eqnarray*} 
+
+Contrast this value with the appropriate cell in the union table, `r round(p.yog,2)`.
+
+## Your Turn!
+
+Using the table() command, construct a joint frequency table for two of your variables.  It will be easiest to do this if those variables are discrete.  If you want to do this for a continuous variable you will probably want to group the values in some sensible way.  The hist() command can do this kind of grouping for you.  
+
+Try to keep the table to no bigger than 3x3, if possible.  To do this you might subset your data according to the variable values or make the groups constructed by hist() pretty large.  If you can do this and still keep your data interesting, so much the better.
+
+Compute the joint and marginal probabilities associated with the pairs of variable values as in the joint probability table above.
+
+> INSERT YOUR CODE HERE
+
+## Joint Events
+
+Joint events are defined as combinations of separate random events. Joint events and compound events are kind of the same thing: A compound event can be represented as a joint event.
+
+We've seen two examples of joint events so far: the first was the observation that a dataset $\{X_1, X_2. \ldots, X_N\}$ is itself a joint event constructed from the observed values for each measurement in a dataset. The second are the probabilities of the joint events of the variables Young and Att we just computed.  Joint events also are the basis of the Law of Total Probability.
+
+To formalize some notation we can step back a little and look at another example. Suppose you have two dice, one is red and the other green. Each die is fair, so that the probabilities of each face on each die are equal to 1/6.
+
+Define:
+
+1.  The outcomes of the experiment consisting of rolling the red and green dice are $R$ = number of red spots and $G$ = number of green spots.
+2.  The joint event of interest is a pair of outcomes written {number of green spots, number of red spots} = $\{G,R\}$.
+3.  The sample space for this experiment is $S = \{\{1,1\},\{1,2\},...,\{6,6\}\}$ ($6 \times 6=36$ elementary events in the sample space).
+4.  For the $i^{th}$ roll of the dice, $Pr(G_i=g,R_i=r) = \left(\frac{1}{6}\right) \left(\frac{1}{6}\right) = \frac{1}{36} =$ joint probability of $g$ green spots and $r$ red spots.
+
+Point 4 above is called the *multiplication rule* for joint probabilities of *independent* events. We'll talk about this more in a minute.
+
+(At this point you might be wondering why I'm torturing you with all this notation.  You will need to have at least a little bit of comfort with probability and its notation to be able to appreciate the concepts in inferential statistics like $p$-values and confidence intervals.  Keep reminding yourself that the measurements in your dataset are random and that the statistics you compute from those measurements are also random.  And if something is random then we need probability to understand and explain it.)
+
+### Your turn!
+
+Using the marginal probabilities you computed for your joint probability table, apply the multiplication rule to try to recover the joint probabilities.  Does $Pr(X_i \cap Y_j) = Pr(X_i) Pr(Y_i)$? Are the probabilities even close?  Can you explain why the multiplication rule does or doesn't hold for your variables?
+
+(For example, if one variable is body weight and the other variable is height, would you expect the multiplication rule to hold?)
+
+> INSERT YOUR CODE HERE
+
+## Conditional Probabilities
+
+Readings:
+
+1. Howell Chapter 5 (5.2)
+2. Lane et al. [Basic Concepts](https://www.onlinestatbook.com/2/probability/basic.html)
+
+Conditional probabilities quantify the likelihood of events given knowledge of whether other related events occurred.  When we make decisions about the probabilities of events around us in real life, these probabilities are almost always conditional on other events and not marginal as in the joint probability table above.  Here are some examples of conditional probabilities:
+
+1. The probability that you have COVID given a negative COVID test.
+2. The probability of passing an exam given the number of hours you studied for it.
+3. The probability of winning a pot in a poker game when you hold two aces.
+4. The probability that the Guardians will make it to the World Series if José Ramirez is injured.
+
+Conditional probabilities are important for scientists because we are trying to establish causal relationships between variables.  If I increase the size of a membership group will a person be more likely to change their political beliefs?  If I reduce the number of items that a person has to remember will they be able to respond faster?  As we progress through this notebook you should be able to recognize how the scientific questions posed by psychological theories translate into statistical questions based on conditional probabilities.
+
+Let's get formal.  The conditional probability of $A$ given $B$ is defined as 
+$$Pr(A | B) = \frac{Pr(A \cap B)}{Pr(B)}.$$
+
+This expression might seem arbitrary, but it's actually quite intuitive.  We are trying to quantify the change in our beliefs about the event $A$ given that we are provided with the information that $B$ occurred.  
+
+Consider another Venn diagram illustrating the probability space for having COVID (C) and testing positive for COVID (T).  
+
+```{r echo=FALSE}
+# Construct a Venn Diagram with arbitrary data and color and label the regions appropriately
+ggVennDiagram(list(T = c(0,1,2,3,6,9), E = c(2,4,6)),label="none",category.names = c("","")) + 
+  theme(legend.position = "none") + 
+  scale_fill_gradient(low="red",high = "yellow") + 
+  geom_text(aes(x = 0, y = 5.5, label = "C and not T = 0.05"), size = 5, color = "black") +
+  geom_text(aes(x = 0, y = -1.5, label = "T and not C = 0.03"), size = 5, color = "black") +
+  geom_text(aes(x = 0, y = 1.5, label = "C and T = 0.20"), size = 5, color = "black") + 
+  annotate("rect", xmin = -Inf, xmax = 5, ymin = -Inf, ymax = Inf,
+           color = "black", fill = NA, linewidth = .5) + 
+  geom_text(aes(x = 0, y = -5, label = "not C and not T"), size = 5, color = "black") + 
+  geom_text(aes(x = -5.5, y = 9, label = "S"), size = 7, color = "black") +
+  geom_text(aes(x = 3.5, y = 7, label = "C"), size = 7, color = "black") +
+  geom_text(aes(x = -3.65, y = -3, label = "T"), size = 7, color = "black") 
+```
+
+It's important to remember that the pieces of the Venn diagram are *joint* probabilities.  So for this particular situation (say, these are the outcomes for all the guests that attended a particular wedding), the marginal probability of having COVID is $Pr(C) = 0.20 + 0.05 = 0.25$ and the probability of getting a positive COVID test is $Pr(T) = 0.20 + 0.03 = 0.23$.  
+
+A conditional probability quantifies how your beliefs about having COVID change given that you receive a positive test.  Before knowing anything about the test, your belief that you have COVID should hover around 0.25.  You take the test and observe a positive result.  How should your belief change?  
+
+The positive test result (the knowledge that $T$ occurred) shrinks the sample space $S$ down to only that circle where $T$ occurred.  
+
+```{r echo=FALSE}
+# Construct a Venn Diagram with arbitrary data and color and label the regions appropriately
+ggVennDiagram(list(T = c(0,1,2,3,6,9), E = c(2,4,6)),label="none",category.names = c("","")) + 
+  theme(legend.position = "none") + 
+  scale_fill_gradient(low="red",high = "yellow") + 
+  geom_text(aes(x = 0, y = -1.5, label = "T and not C = 0.03"), size = 5, color = "black") +
+  geom_text(aes(x = 0, y = 1.5, label = "C and T = 0.20"), size = 5, color = "black") + 
+  geom_text(aes(x = -3.65, y = -3, label = "T"), size = 7, color = "black") 
+```
+
+So now finding yourself firmly inside the $T$ circle, which has total area of $Pr(T)=0.23$, of that 0.23, 0.20 of it is having COVID and 0.03 of it is not having COVID.  The proportion of the space inside $T$ that is associated with being sick is $Pr(C|T) = 0.20/0.23 = 0.87$, or
+$$Pr(C|T) = \frac{Pr(C \cap T)}{Pr(T)},$$
+which is exactly the definition provided above. 
+
+Returning to the GSS data, we might expect that older people (Young = FALSE) are more likely to endorse the attitude that younger people should pay more attention to the advice that they give (Att = 1).  This question involves the conditional probability $Pr(\text{Att=1} | \text{Young=FALSE}).$  We know from our earlier computations that the probability of being older than 49 *and* endorsing this attitude is $Pr(\text{Att}=1 \cap \text{Young=FALSE}) = 0.14$.  The marginal probability $Pr(\text{Young=FALSE}) = 0.26$.  Then
+$$ 
+Pr(\text{Att=1} | \text{Young=FALSE}) = \frac{Pr(\text{Att}=1 \cap \text{Young=FALSE})}{Pr(\text{Young=FALSE})} = \frac{0.14}{0.26} = 0.54.
+$$.
+
+How do we interpret this value?  Recall that the marginal probability of endorsing this attitude is $Pr(\text{Att}=1) = 0.39$.  Knowing that a respondent is not young therefore increases the probability that they will endorse this attitude.  (We might call this the "Boomer Effect.")
+
+Note something important: for two events $A$ and $B$ the conditional probability $Pr(A|B) \ne Pr(B|A)$.  So while $Pr(\text{Att=1} | \text{Young=FALSE}) = 0.54$, 
+$$ 
+Pr(\text{Young=FALSE} | \text{Att=1}) = \frac{Pr(\text{Young=FALSE} \cap \text{Att=1})}{Pr(\text{Att=1})} = \frac{0.14}{0.39} = 0.36.
+$$
+Contrasting this value to the marginal probability of a respondent being older than 49 (0.26), we see that knowing that someone endorsed the sentiment that young people should listen to their elders increases the probability that the person is older than 49.  
+
+Be very careful when you're thinking about conditional probabilities to determine which of two events is *given* or fixed and to which event the probability is to be assigned.
+
+### Your turn!
+
+Return to your joint probability table.  Compute the conditional probability distributions for one variable given the different values of the other variable.  So, for example, suppose your table looks like this:
+
+|   | X=1  | X=2 | X=3 |
+|:---|:---:|:----:|:---:|
+| Y = 0 | $p_{01}$ |$p_{02}$ | $p_{03}$ |
+| Y = 1 | $p_{11}$ |$p_{12}$ |$p_{13}$ |
+
+The values $p_{ij}$ are the joint relative frequencies or probabilities of each pair $ij$ of variable values.  
+
+I'm asking for a table that looks similar to this (only with numbers):
+
+|   | X=1  | X=2 | X=3 |
+|:---|:---:|:----:|:---:|
+| Y = 0 | $Pr(X=1 | Y=0)$ |$Pr(X=2 | Y=0)$ | $Pr(X=3 | Y=0)$ |
+| Y = 1 | $Pr(X=1 | Y=1)$ |$Pr(X=2 | Y=1)$ | $Pr(X=3 | Y=1)$ |
+
+Do the two variables appear to be related?  Compare the conditional distributions to the appropriate marginal distribution, in this case $Pr(X=x)$ for $x=1,2,3$.  Comment on any interesting differences (e.g., "Boomer Effects") that you observe.
+
+## Independent Events
+
+We just saw how the probability of an event changes when we know something about another related event.  In some important circumstances the knowledge of a "related" event doesn't change the probability at all.  In this case we say that the two events are *independent*.
+
+If two events $A$ and $B$ are independent then knowing that $B$ occurred does not change the probability that $A$ will occur. That is,
+
+1. $Pr(A|B) = Pr(A)$ and
+2. $Pr(B|A) = Pr(B)$.
+
+From either 1. or 2. above we arrive at the *multiplication rule* for joint independent events.  If $Pr(A|B) = Pr(A)$, then because $Pr(A|B) = Pr(A \cap B)/Pr(B)$, 
+$$Pr(A) = \frac{Pr(A \cap B)}{Pr(B)} \rightarrow \Pr(A \cap B) = Pr(A)Pr(B).$$
+
+A word of caution: You will be asked at some point to determine the joint probability $Pr(A \cap B)$ of two events.  You will think back to this and you will say to yourself, "Ah ha!  All I have to do is multiply the marginal probabilities together!"  This would be a mistake.  First determine whether the two events are independent.  If so, multiply away!  However, if you don't know, then you need to approach the problem either from the raw frequencies of the two events in your data or from the conditional probabilities. Remember this. 
+
+Independence is often something that we assume but do not test.  If I measure a child's IQ I will probably assume that their IQ score is independent from any other child's IQ that I might measure.  This assumption is often unwarranted.  If the child is part of a family group then their score is likely to tell us something about the other IQ scores in that family.  If I measure the ACT score of a college freshman from a small Ivy-league school then that score is unlikely to be independent from the score of any other student from that same school.  
+
+Events that are truly independent come from experiments like coin flipping, die rolling, or the slot number on a roulette wheel.  They arise from physical systems that are unchanged as experiments with them are performed repeatedly.  In the social sciences the independence assumption is widely used for its convenience but always be aware that it could be problematic.
+
+### Your turn!
+
+Think about your variables carefully.  Are there two that should be independent?  For instance, the number of siblings a person has might be independent of their health.  Call these two (possibly) independent variables $X$ abd $Y$.  Compute the conditional probabilities $Pr(X|Y)$ and $Pr(Y|X)$ and contrast those with the marginal probabilities $Pr(X)$ and $Pr(Y)$.  Are the variables independent?
+
+## Counting
+
+Video: [Counting](https://www.khanacademy.org/math/statistics-probability/counting-permutations-and-combinations)
+
+Probabilities are computed by counting up the events that are consistent with a certain outcome and dividing by the total number of possible events in the sample space.  Check back to the probability of rolling an odd number of spots with a fair die: we counted the number of odd possibilities (3: \{1,3,5\}) and divided by the total number of possible outcomes (6: 3/6 = 1/2).  The importance of counting is captured by the _Fundamental Counting Principle_: If an event can occur in $n$ possible ways, and another event can occur in $m$ possible ways, then the total number of possible outcomes is $n \times m$. This principle can be extended to arbitrarily complex combinations of events. 
+
+There are two possible outcomes for the Young variable, TRUE and FALSE.  There are four possible outcomes for the health variable.  Therefore there are $2 \times 4 = 8$ possible outcomes for the joint event Young $\times$ health.  Therefore there are 8 cells in the frequency table describing the joint distribution of Young and health.
+
+```{r}
+table(Young,data$health)
+```
+
+(Note that the joint events described by this table are not equiprobable, so the joint probability that a respondent is old and reports their health as "2" is not 1/8, instead it's 99/873.)
+
+### Sampling With and Without Replacement
+
+An important consideration in counting the number of possible outcomes has to do with how events are sampled.  If you are flipping a coin the probabilities of heads or tails does not change with repeated flips of the coin: this is sampling *with* replacement from the sample space $S=\{H,T\}$.  If you are pulling M&Ms out of a bag and eating them, marking down the color for each one, this is sampling *without* replacement and the sample space $S$ will change with each draw.
+
+Sampling with and without replacement is a problem that arises in the design of experiments.  Suppose you have a set of stimuli $\{a,b,c,d\}$ to which participants are to respond over a course of 40 trials.  If you sample with replacement, there are $4^{40} > 1e+24$ possible sequences of trials (over a septillion, approximately the number of grains of sand on the planet Earth).  We obtain this number through the Fundamental Counting Principle:  There are 4 possible outcomes for the first trial, 4 for the second, 4 for the third, etc., which is $4 \times 4 \times \ldots \times 4 = 4^40$.
+
+Sampling without replacement greatly reduces the number of outcomes.  We would have 4 possible outcomes for the first trial, 3 for the second, 2 for the third, and then only 1 for the fourth, so $4 \times 3 \times 2 \times 1 = 24$.  But we need 40 trials of stimuli, so let's start again fresh with the 4 possible stimuli on the 5th trial, resulting in 24 possible sequences for the trials 5-8.  There are 10 blocks of 4 trials in a total of 40 trials, so again using the Fundamental Counting Principle, there would be $24 \times 24 \ldots \times 24 = 24^10 > 6e+13$ possible sequences of trials (60 trillion). This is considerably less than the number of grains of sand on the Earth but still a very large number
+
+### Challenge
+
+Consider the stimulus set $\{a,b,c,d\}$.  How many stimulus sequences are possible if the stimulus can never repeat on two consecutive trials?  If you were designing an experiment, how would you make sure that this condition is maintained across a stimulus sequence?  Write some R code that would generate appropriate random sequences of $\{a,b,c,d\}$ for you.
+
+> INSERT YOUR CODE HERE
+
+## Sampling Considerations
+
+Reading: [Sampling](https://en.wikipedia.org/wiki/Sampling_(statistics))
+
+Video: [Design](https://www.khanacademy.org/math/statistics-probability/designing-studies)
+
+Sampling is a hugely important problem in the social sciences: How do we construct or obtain a group of individuals to study?  We pull them from a population (of college students, patients with cancer, children in a school, etc.)  Even though we're talking about people or animals we usually assume that sampling is done with replacement.  This is because it turns out that if the population is infinitely large sampling without replacement gives the same results as sampling with replacement.
+
+More important, for inference, is the issue of random sampling.  In a random sample, not only does each *individual* in the population have an equal chance of appearing in the sample, but also each *sample* has an equal probability of being obtained.
+
+Sometimes we might not want to have completely random samples.  Sometimes it's a good idea to *stratify* a sample to control for some confounding variable.  For example, if you were interested in education levels of some population, you might want to make sure that you stratified your sample so that the proportions of different income levels in the sample were the same as in the population.
+
+### Your turn!
+
+Please write a short paragraph that discusses the way that your data set was sampled.  When you imagine the ways in which your sample represents a population, think also about the kinds of biases there might be in your sample.  Is it truly a random sample?  Or was it a "convenience" sample?  A biased sample will over-represent some individuals in a population and under-represent others.  Can you think of societal issues that are not adequately understood because the science relies on biased samples?
+
+## Permutations and Combinations
+
+Readings: 
+
+1. Howell Chapter 5 (5.6)
+2. Lane: https://onlinestatbook.com/2/probability/permutations.html
+3. [Permutations and combinations with R](https://www.r-bloggers.com/2019/06/learning-r-permutations-and-combinations-with-base-r/)
+
+
+
+Back to the issue of computing probabilities.  There are two important concepts involved in counting the number of possible outcomes: permutations, the number of ways that $n$ unique objects can be ordered, and combinations, the number of collections (combinations) of $m$ unique objects that can be sampled from a total of $n$ unique objects?
+
+We're going to run through how these concepts are computed, all related to the problem of counting the number of possible events with the goal of determining probability.  You will see these computations arise when we encounter different probability distributions.  Knowing these distributions is the basis for determining what kinds of statistical inferences can be made about different kinds of statistics.  You will rarely be asked to determine a probability distribution from first principles, but you should be able to recognize the different distributions and also be able to identify the distributions that describe the behavior of different fundamental statistics.
+
+### Permutations
+
+Video: [Permutation formula](https://www.khanacademy.org/math/statistics-probability/counting-permutations-and-combinations/permutation-lib/v/permutation-formula)
+
+Counting permutations is pretty easy if you don't overthink it.  Remember those 4 stimuli $\{a,b,c,d\}?  How many ways can you order them?  
+
+There are 4 ways to write down the first stimulus, 3 ways for the second, 2 ways for the third, and only 1 left for the fourth.  We determined that there were 24 different stimulus sequences if we sample without replacement.  But this is just the number of permutations (orders) of 4 unique stimuli.  We use the factorial notation "!" to indicate this computation.  That is, $4! = 4 \times 3 \times 2 \times 1 = 24$.  More generally,
+$$n! = n(n-1)(n-2)\cdots(3)(2)(1).$$
+
+Note that $0!$ = $1!$ = 1.  The factorial function is a special case of a *gamma* ($\Gamma()$) function that I won't trouble you with, except to say that the reason that $0! = 1$ arises from this function.  I mention it here because R computes factorials with gamma().  The only thing you need to remember is that $n! = \Gamma(n+1)$.
+
+```{r}
+4*3*2*1
+gamma(5)
+```
+
+The output of the gamma function is only going to make sense in this context if $n$ is an integer (0, 1, 2, ...).  The more general gamma function defines values for noninteger arguments like 4.5, but writing $4.5!$ isn't a nice way to talk about what it's doing.
+
+```{r}
+gamma(4.5)
+```
+
+One kind of count you might want to determine is the number of orderings of $n$ objects drawn without replacement from a larger set of $m$ objects.  As a concrete example, suppose you want to form 4-word sentences from a vocabulary of 100 words.  
+
+Think about how many ways you can pull out the first word, then the second, and so forth.  Ignoring any potential violations of grammar, there are $100 \times 99 \times 98 \times 97 = 970,200$ possible sentences.  Recognize also that 
+$$
+100 \times 99 \times 98 \times 97 = \frac{100!}{96!}.
+$$  
+In general then, the number of orderings of $n$ objects drawn without replacement from a larger set of $m$ objects is
+$$ 
+m(m-1)(m-2)\cdots(m-n+1) = \frac{m!}{(m-n)!}.
+$$
+```{r}
+100*99*98*97
+gamma(101)/gamma(97)
+```
+
+This quantity is sometimes written as $_mP_n$ (but I hate that notation, cf. the Lane online text).
+
+### Combinations
+
+Videos: 
+
+1. [Combinations intro](https://www.khanacademy.org/math/statistics-probability/counting-permutations-and-combinations/combinations-lib/v/introduction-to-combinations)
+2. [Combination formula](https://www.khanacademy.org/math/statistics-probability/counting-permutations-and-combinations/combinations-lib/v/combination-formula)
+
+Perhaps more important for us than counting permutations is counting combinations.  Combinations arise when again we sample without replacement. They differ from permutations in that the order of the objects in the combination doesn't matter.  Consider a class of 30 children.  If we want to put them in groups, the group that contains Anna, Adam, Ava and Aaron is the same as the group that contains Adam, Aaron, Anna and Ava.  
+
+We will still approach the problem of how many possible groups of 4 we could obtain from 30 children by starting with permutations.  There are 30 ways to obtain the first child, 29 for the second, 28 for the third and 27 for the fourth.  
+
+```{r}
+gamma(31)/gamma(27)
+```
+
+Remember that this number retains the information about the order in which the children were sampled.  We don't care about this ordering.  Of the 657,720 possible groups, how many of them are the same group just reordered?  
+
+Because there are $4!=24$ possible orders of the four children, this means that 24 of the 657,720 groups are actually of the same children, and so $657,720/24 = 27,405$ is the number of unique combinations of 4 children drawn from 30.  
+
+The number we just computed is $30!/(26!~4!)$.  More generally, if we want to compute the number of unique combinations ("unique" here means all the objects in the combination are the same if reordered) of size $n$ taken from a larger group of size $m$, we compute 
+$$
+\binom{m}{n} = \frac{m!}{(m-n)! n!}
+$$.  
+This number is called the binomial coefficient and we refer to the value it gives as "$m$ choose $n$."  Lane writes it as $_mC_n$, which is a little easier to swallow because it maps mnemonically onto "$m$ choose $n$."  You may also have seen this number arise in [Pascal's triangle](https://en.wikipedia.org/wiki/Pascal%27s_triangle).  It is the value of the coefficients in a binomial expansion:
+$$
+(a+b)^n = \binom{n}{0} a^n + \binom{n}{1} a^{n-1} b + \binom{n}{2} a^{n-2} b^2 + \cdots + \binom{n}{j} a^{n-j} b^j + \cdots + \binom{n}{n} b^n.
+$$
+In R, combinations are computed with the choose() function.
+```{r}
+choose(100,4)
+```
+
+
+### Your turn!
+
+Reading: https://www.ohiolottery.com/games/draw-games/pick-3
+
+Twice a day the Ohio lottery conducts a drawing for the "Pick-3" game.  The state samples three digits from the numbers 0-9.  Bettors try to match the sampled digits in a number of different ways.  Two of them are the following:
+
+1. A straight bet: the numbers you pick must match the sampled numbers in the order in which they were sampled
+2. A boxed bet: the numbers you pick match the sampled numbers in any order.  If you pick 3 different numbers, this is called a "6-way boxed bet."  If you pick two of the same numbers (e.g., 1,1,3), this is called a "3-way boxed bet."
+
+Answer the following questions:
+
+1.  How many possible lottery outcomes are there?
+2.  What is the probability of winning under each of these (3) betting schemes? 
+3.  Of the 3 betting options above, which would you use for a triple (e.g., (1,1,1))?  Is the probability of winning the same under the three betting options?
+
+#### Challenge
+
+Simulate the Pick-3 game in R and estimate the probabilities of matching 0, 1, 2, or 3 values.  Use the rdunif() function in the extraDistr package to generate the state's samples and note that the probabilities of winning will be the same for (say) (1,2,3) and for (7,8,9).  This means that you can hold your picks fixed and just vary the state's samples. Here's some code to get you started:
+
+```{r}
+# If you don't have this one yet, install and load "extraDistr"
+# install.packages("extraDistr")
+# library("extraDistr")
+
+picks <- c(1,2,3)
+draw <- rdunif(3,min=0,max=9)
+
+# %in% is a Boolean operator that will return TRUE if 
+# an element of picks is in draw
+box.match <- sum(picks %in% draw) 
+# For a straight match the vector picks has to exactly equal draw:
+straight.match <- as.numeric(identical(picks,draw)) 
+
+# INSERT YOUR CODE HERE
+```
+
+#### Harder challenge
+
+The game Keno is another kind of "Pick-X" game, except the sampling takes place without replacement.  The state [samples 20 numbers without replacement from the numbers 1-80](https://www.ohiolottery.com/winning-numbers/keno-drawings).  The bettor chooses some number of "spots" to play up to 10 maximum, and chooses numbers without replacement from 1-80 to fill those spots.  Without any betting variations, payoffs are determined by the number of matches between the bettor's spots and the 20 numbers sampled by the state.  
+
+1. Let $N$ be the total number of possibilities (80) and let $n$ be the number sampled by the state (20).  If $m$ is the number of spots you choose to play, what is the probability that you match $0 \le x \le m$ of the numbers sampled by the state?  *Hint: you not only have to consider how many ways you can get $x$ matches, you also have to consider how many ways you can get $m-x$ mismatches.*
+2. Simulate the Keno game in R.  You'll use the sample() function for this. Assuming that you bet $1 on each game, can you determine the number of spots you should play to optimize your winnings?
+3. Why do you think the lottery restricts the maximum number of spots you can play to 10?
+4. If you look at the payouts (https://www.ohiolottery.com/games/keno#tab-panel2) you'll see that the 10-spot game pays out for $x=0$ matches.  Why is that?
+

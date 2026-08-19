@@ -1,0 +1,1496 @@
+---
+title: "Module 2 - Effect Sizes and Power"
+author: "TVZ"
+output:
+  word_document:
+    toc: true
+    toc_depth: '3'
+  pdf_document:
+    toc: true
+    toc_depth: 3
+  html_document:
+    df_print: paged
+    toc: true
+    toc_depth: 3
+urlcolor: blue
+editor_options:
+  markdown:
+    wrap: 80
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r results='hide'}
+# Upload the libraries used in this document
+library("ggplot2")
+library("tinytex")
+library("extraDistr")
+library("sysid")
+library("DescTools")
+library('effectsize')
+library('PairedData')
+library('pwrss')
+```
+
+# Learning Objectives
+
+At the end of this notebook you should be able to:
+
+1.  Understand and define effect size, and explain its role in interpreting the
+    magnitude of an effect or difference.
+2.  Compute common effect size measures for the difference between means
+    (Cohen's $d$, Hedges' $g$, Glass' $\Delta$) by hand and with R functions.
+3.  Interpret effect sizes in the context of your discipline, distinguishing
+    between small, medium, and large effects based on established conventions.
+4.  Understand the practical significance of different effect sizes and how they
+    contribute to scientific and real-world implications.
+5.  Define statistical power and explain its importance in hypothesis testing.
+6.  Understand the concept of the noncentrality parameter $\delta$ and its role
+    in characterizing the distribution of test statistics under the alternative
+    hypothesis.
+7.  Explain how noncentrality parameters relate to effect sizes, sample sizes,
+    and power.
+8.  Perform power analyses for various statistical tests of mean differences
+    (e.g., t-tests) using noncentrality parameters to understand the
+    relationship between sample size, effect size, and power.
+9.  Use R to perform power calculations that incorporate noncentrality
+    parameters.
+10. Use R to determine necessary sample sizes for different combinations of
+    effect sizes, $\alpha$-levels, and one- and two-tailed tests.
+11. Evaluate the role of power and noncentrality parameters in study design,
+    including trade-offs between sample size, effect size, and desired
+    significance level.
+12. Identify the consequences of underpowered studies (e.g., increased risk of
+    Type II errors) and overpowered studies (e.g., potential for detecting
+    trivial effects).
+13. Analyze and interpret the reporting of effect sizes, power, and
+    noncentrality parameters in research articles.
+14. Make informed decisions about sample size requirements and interpret
+    findings based on the magnitude of effects and statistical power rather than
+    solely on p-values.
+    
+## A special note
+
+In the months since I wrote the first version of this notebook the pwrss package was significantly revised, deprecating a suite of functions that began with "pwrss.", such as "pwrss.t.2means."  If you see reference to these deprecated functions be aware that: (1) they will still work until they are removed from the library, and (2) you are seeing them because I missed them and failed to update them.  Please let me know if you run across these older functions in this notebook.
+
+# Upload GSS Data
+
+```{r}
+# My data are in comma separated value (csv) format, with the first line (header) naming the variables:
+data <- read.csv("GSS_1980.csv",header=TRUE)
+data$X <- NULL
+```
+
+# Effect Sizes
+
+Readings:
+
+1.  Howell Chapter 8 (Section 8.3)
+2.  Navarro [Effect
+    Size](https://learningstatisticswithr.com/book/hypothesistesting.html#effect-size)
+
+Video: <https://www.youtube.com/watch?v=-pdD_YhcdcA> (This video goes into some
+depth, covering more types of effect sizes than we did in class, but it's quite
+good.)
+
+Think about the null and alternative hypotheses for a one-sample $t$ test:
+\begin{eqnarray*}
+H_0: && \mu = \mu_0 \\
+H_1: && \mu \ne \mu_0.
+\end{eqnarray*}
+
+Our goal in null hypothesis testing, in this case a $z$- or $t$-test, is to
+reject $H_0$. It is good if we are able to reject $H_0$ because $H_0$ defines a
+"failure" of our experiment: no *effect* of whatever treatment or manipulation
+we employed in the experiment.
+
+However, because the standard error of the sample mean $\overline{X}$ is
+$\sigma/\sqrt{N}$ (estimated by $s/\sqrt{N}$), it gets very small as $N$
+increases. Consequently the test statistics
+$z = \dfrac{\overline{X} - \mu_0}{\sigma/\sqrt{N}}$ and
+$t = \dfrac{\overline{X} - \mu_0}{s/\sqrt{N}}$ get very large. The implication
+of this is that even tiny effects will result in rejection of $H_0$ for large
+values of $N$. This will happen even if the effect is meaningless.
+
+For example, [Gilbert et al.
+(2014)](https://www.nejm.org/doi/full/10.1056/NEJMoa1308573) reported on the
+effectiveness of a drug (bevacizumab) for treatment of
+[glioblastoma](https://en.wikipedia.org/wiki/Glioblastoma). The numbers of
+patients in the treatment and placebo groups were 312 and 309, respectively.
+
+At the end of the study, 33% of the patients were still alive. It should be
+pretty clear that because a third of the patients had not yet passed from the
+disease the researchers could not report mean times to death, but because over
+half the patients in each group had died they based their analysis on the
+medians. They reported that the median survival post diagnosis in the treatment
+group was 15.7 months and in the placebo group was 16.1 months, a difference of
+12.2 days (in the wrong direction if they were hoping that the treatment might
+increase survival time). The study did not report standard deviations for each
+group but did report the 95% confidence intervals around the median survival
+times. This is a computation based on the binomial distribution, so they didn't
+have to wait for everyone in the sample to die before they could estimate the
+intervals. These intervals were [14.2,16.8] and [14.8,18.7] for the treatment
+and placebo groups, respectively.
+
+Because the sample sizes are large, we can estimate what $\sigma$ might have
+been for the two groups based on the normal approximation. The pooled variance
+estimate is $s_P^2 = 140.79$.
+
+### Aside: How did I get $s_P^2 = 140.79$?
+
+You can skip this if you aren't interested!
+
+Suppose the survival times follow a normal distribution with mean $\mu$ and
+variance $\sigma^2$. Then the sampling distribution of the median is normal with
+mean $\mu$ and variance $\dfrac{\pi}{2} \dfrac{\sigma^2}{N}$, similar to the
+sampling distribution of the mean $\overline{X}$ with the extra $\pi/2$ factor
+in the variance.
+
+These facts mean that the width of a 95% confidence interval around the sample
+median $M$ is $2(1.96) \sigma \sqrt{\dfrac{\pi}{2N}}$. The widths of the
+confidence intervals and sample sizes give estimates of the (common) standard
+deviation $\sigma$ of $s_T = 9.35$ and $s_P = 13.95$ for the treatment ($T$) and
+placebo ($P$) groups, respectively.
+
+Assuming equal variances, the pooled variance estimate is $s^2_P = 140.79$.
+
+(I include my computations here in case they are of interest.)
+
+```{r}
+# Sample sizes for treatment (T) and placebo (P) groups
+N.T <- 312
+N.P <- 309
+
+# 95% confidence intervals for the median survival times (months)
+C.T <- c(14.2,16.8)
+C.P <- c(14.8,18.7)
+
+# Estimates of sample standard deviations
+s.T <- sqrt(2*N.T/pi)*(C.T[2] - C.T[1])/(2 * 1.96)
+s.P <- sqrt(2*N.P/pi)*(C.P[2] - C.P[1])/(2 * 1.96)
+
+# Pooled variance estimate
+sp2 <- ((N.T-1)*s.T^2 + (N.P-1)*s.P^2)/(N.T + N.P - 2)
+```
+
+## Test of Two Medians
+
+The researchers reported that the difference between the two groups was not
+significant. We can reproduce that null effect by computing an estimate of the
+$t$-statistic and computing its $p$-value, although they used a different
+procedure that was specific to survival analysis. Note also that there are
+several other potential procedures to test the difference between two medians.
+Here I employ the same $t$-test as for the difference between two means.
+
+```{r}
+# Sample medians
+M.T <- 15.7
+M.P <- 16.1
+
+# Estimate a t-statistic
+t <- (M.T - M.P)/sqrt(sp2*(1/N.T + 1/N.P))
+
+# Compute a p-value for a two-tailed test
+cat("The t-statistic ",t," with ",N.T + N.P - 2," degrees of freedom has p-value ",
+2*(1 - pt(abs(t),N.T + N.P - 2)))
+```
+
+Because the $p$-value is greater than $\alpha=0.05$, we fail to reject $H_0$.
+
+Suppose now that all the sample statistics were exactly the same for an
+experiment in which we observed 50 times the number of patients.
+
+```{r}
+N.T <- 50 * N.T
+N.P <- 50 * N.P
+```
+
+Recompute $t$ and its $p$-value with these new sample sizes.
+
+```{r}
+t <- (M.T - M.P)/sqrt(sp2*(1/N.T + 1/N.P))
+
+cat("The t-statistic ",t," with ",N.T + N.P - 2," degrees of freedom has p-value ",
+2*(1 - pt(abs(t),N.T + N.P - 2)))
+```
+
+Now the difference is significant. Because we did a two-tailed test, we might
+conclude that the drug was harmful and resulted in a significant reduction in
+lifespan. (The drug in fact significantly lengthened the amount of time that
+patients lived before their symptoms recurred by over 3 months -- what the
+researchers referred to as "progression-free survival.")
+
+The difference between the two groups was only 12 days. With a large enough
+sample size, this is a significant difference. For smaller samples, this is not
+significant. Therefore we can see that "significance" is a concept that is
+separate from "important" or "meaningful." Glioblastoma is a devastating
+disease, and we can be almost certain that its victims would rather not live out
+those last 12 days of their lives.
+
+This illustrates that we need a way to talk about the difference between means
+in a way that can't be confounded with sample size, and this way is called an
+*effect size*. There are a number of difference kinds of effect sizes. When we
+talk about the difference between measures of central tendency we use what are
+called $d$ or distance measures. There are three distance measures that we will
+discuss:
+
+1.  Cohen's $d$
+2.  Hedges' $g$
+3.  Glass' $\Delta$
+
+## 1. Your turn!
+
+Before we proceed, explore your dataset. You did some $t$-tests using it in the
+last notebook. Do you have any "significant" effects in there that seem
+uninteresting? Poke around a little bit. If you find one, describe it. If you
+don't have any, describe what you did to try and find one.
+
+> Insert your answer here.
+
+## Cohen's $d$
+
+Consider the null and alternative hypotheses \begin{eqnarray*}
+H_0: && \mu = \mu_0 \text{ and }\\
+H_1: && \mu = \mu_1, \\
+\end{eqnarray*} where the alternative now indicates a specific value for the
+population mean when the null hypothesis is false.
+
+The difference between $\mu_0$ and $\mu_1$ is called the "effect" of the
+variable responsible for changing the population mean from $\mu_0$ to $\mu_1$.
+Like the $z$-score, Cohen's $d$ standardizes this difference by dividing by the
+population standard deviation $\sigma$. The effect size $$
+d=\left| \dfrac{\mu_1 - \mu_0}{\sigma} \right|
+$$ is the number of standard deviations by which the two means are separated.
+Note the absolute value: we are primarily concerned with the magnitude of the
+separation and not the direction.
+
+When we are in the experimental design stage, we talk about effect sizes without
+worrying about specific values of $\mu_1$ and $\sigma^2$. When we are asked to
+report an observed effect size in a Results section, we estimate Cohen's $d$ in
+the following ways:
+
+For a $z$-test, $$
+d=\left| \dfrac{\overline{X} - \mu_0}{\sigma} \right|.
+$$ For a one-sample (or dependent sample) $t$-test $$
+d=\left| \dfrac{\overline{X} - \mu_0}{s} \right|.
+$$ For an independent samples $t$-test, $$
+d=\left| \dfrac{\overline{X}_1 - \overline{X}_2}{s_p} \right|.
+$$
+
+We characterize the size of an effect on the means using Cohen's convention,
+which is given in the following table.
+
+| Value of Cohen's $d$ |  Size  |
+|:--------------------:|:------:|
+|         0.2          | Small  |
+|         0.5          | Medium |
+|         0.8          | Large  |
+
+*Table 1. Definition of small, medium, and large effect sizes.*
+
+### Examples Using the GSS 1980 Data
+
+Let's explore the relationship between respondent age and reported health: older
+respondents are likely to report poorer health than younger respondents. We'll
+divide the respondents in half by age and compute the mean reported health for
+younger and older respondents. Remember that the health rating question was
+coded as 1=excellent, 2=good, 3=fair, 4=poor, so the mean would be higher for
+older respondents than younger respondents if the alternative hypothesis were
+true. The null and alternative hypotheses are \begin{eqnarray*}
+H_0: && \mu_{\text{young}} = \mu_{\text{older}} \text{ and }\\
+H_1: && \mu_{\text{young}} < \mu_{\text{older}}. \\
+\end{eqnarray*}
+
+The results of the $t$-test suggest that the null hypothesis should be rejected.
+
+```{r}
+young <- data$AGE < median(data$AGE)
+t.test(data$HEALTH~young,alternative="greater",var.equal=TRUE)
+```
+
+We can compute the observed effect size (the estimate of Cohen's $d$) by hand
+and by using the cohens_d() function.
+
+```{r}
+# By hand
+sp <- sd_pooled(data$HEALTH~young)
+d <- (mean(data$HEALTH[!young])-mean(data$HEALTH[young]))/sp
+d
+```
+
+The cohens_d() function requires the raw data vectors for two variables (x and
+y, below, or a function or data frame with two variables), specification of the
+alternative, the null mean, and whether the variances of x and y are assumed to
+be equal or not.
+
+```{r}
+# Using the cohens_d() function
+cohens_d(x=data$HEALTH[!young],y=data$HEALTH[young],alternative="greater",var.equal=TRUE)
+```
+
+If we were to write up these results for publication, we would say something
+like
+
+> The reported health ratings for the older group were significantly higher than
+> those for the younger group ($t(871) = 3.27$, $p = 0.0006$, Cohen's
+> $d = 0.22$).
+
+The output of the cohens_d() function also produces a 95% confidence interval
+for the estimate of $d$ which is computed via bootstrapping, which we will talk
+about in the next notebook.
+
+### The Anorexia Dataset
+
+For dependent designs we compute Cohen's $d$ by specifying "paired=TRUE." Let's
+compute Cohen's $d$ for the paired anorexia data.
+
+```{r}
+data(anorexia)
+t.test(x=anorexia$Prewt,y=anorexia$Postwt,paired=TRUE,alternative="less")
+cohens_d(x=anorexia$Prewt,y=anorexia$Postwt,paired=TRUE,alternative="less")
+```
+
+The value of $d$ computed by cohens_d() is about -0.35. [Some
+references](https://www.tqmp.org/RegularArticles/vol14-4/p242/p242.pdf)
+(including Cohen, 1988) suggest that the estimate of $d$ should be corrected for
+the correlation between groups for dependent designs. This correction is $$
+d' = \dfrac{d}{\sqrt{2(1-r)}},
+$$ where $r$ is the correlation coefficient. The cohens_d() function with the
+paired=TRUE option does *not* do this.
+
+```{r}
+d <- (mean(anorexia$Prewt)-mean(anorexia$Postwt))/
+      sd(anorexia$Prewt-anorexia$Postwt)
+cat("The value of d without correction is ",d,", while the value corrected for correlation is ",
+d/sqrt(2*(1-cor(anorexia$Prewt,anorexia$Postwt))))
+```
+
+Make sure that when you use built-in functions like t.test() and cohens_d() that
+you use the same options in both. The effect size will change depending on the
+options that specify the direction of the test, whether the variance estimate is
+based on pooling or not, and so forth. If you fail to use the same options your
+results will not be accurate.
+
+Compare:
+
+```{r}
+cohens_d(x=anorexia$Prewt,y=anorexia$Postwt,paired=TRUE,alternative="less")
+cohens_d(x=anorexia$Prewt,y=anorexia$Postwt,paired=FALSE,alternative="less")
+```
+
+### 2. Your turn!
+
+You did some $t$-tests in the last notebook (Tests_of_Means.Rmd). Compute the
+effect sizes for two of them. Categorize the effects as small, medium or large.
+Indicate whether the tests are for a single mean, a test of two means, or a test
+of two means in a dependent sample design.
+
+> Insert your response here
+
+```{r}
+# Insert your code here
+```
+
+## Hedges' $g$
+
+Cohen's $d$ is biased for small sample sizes: on average, it overestimates the
+magnitude of the true effect size. The following simulation demonstrates this
+bias.
+
+```{r}
+set.seed(346743) # For replicability
+# Show that Cohen's d is biased
+bignum <- 10000
+
+# Sample sizes
+N.1 <- 6
+N.2 <- 8
+
+# Population parameters
+mu.1 <- 15
+mu.2 <- 25
+sigma <- 10 # the true effect size is 1
+
+# Simulate the sampling distribution of Cohen's d
+d <- vector()
+for (i in 1:bignum) {
+  # Draw two samples from each of two populations
+  X.1 <- rnorm(N.1,mu.1,sigma) 
+  X.2 <- rnorm(N.2,mu.2,sigma)
+  
+  # Pool the variance
+  sd <- sd_pooled(X.1,X.2)
+  
+  # Compute the sample estimate of Cohen's d
+  d[i] <- ((mean(X.1) - mean(X.2))/sd)
+  
+# You can use the cohens_d() function but it is very slow
+#  d[i] <- cohens_d(X.1,X.2)$Cohens_d
+}
+
+# Compute the real d and compare to the mean of the sampling distribution of d
+real.d <- (mu.1 - mu.2)/sigma
+cat("The actual d=",real.d," and the mean of the sample of estimated ds is ",mean(d),".\n")
+```
+
+Plot the sampling distribution of the estimates $d$s and plot on it the mean (in
+blue) and the true value of the effect (in red).
+
+```{r}
+hist(d,breaks=50,freq=FALSE,xlim=c(-3,1))
+abline(v=c(real.d,mean(d)),col=c("red","blue"))
+```
+
+This simulation shows how the mean of the estimated $d$s is slightly higher in
+magnitude than the actual $d$: in this case the effects are in the negative
+direction, and the absolute value of the mean of the estimated $d$s is bigger
+than that of the actual $d$. The extent of bias will vary somewhat depending on
+your simulation, but you should see a difference between the mean and actual
+value of around 0.07. This might not seem like a lot at first glance, but if
+0.20 is a small effect size, 0.07 is 35% of that small effect.
+
+The overestimation is especially prominent when samples sizes are less than 20.
+Hedges' $g$ is designed to correct for this bias.
+
+Hedges' $g$ is derived from Cohen's $d$: $$
+g = d~ J(\nu),
+$$ where $\nu$ is the degrees of freedom of the test performed and $$
+J(\nu) = \dfrac{\Gamma(\nu/2)}{\Gamma((\nu-1)/2) \sqrt{\nu/2}}.
+$$ Recall from earlier that the gamma function $\Gamma(x) = (x-1)!$ when $x$ is
+an integer. Here is a little function that can compute $J(\nu)$:
+
+```{r}
+J <- function(nu) {
+  # We have to work from the logs to avoid overflow (gamma(20) = 1.22e+17, but lgamma(20) = 39.34).
+  log.g <- lgamma(nu/2) - 0.5*log(nu/2) - lgamma((nu-1)/2)
+  return(exp(log.g))
+}
+```
+
+Let's now compute Hedges' $g$ for the anorexia data.
+
+```{r}
+# By hand
+df <- length(anorexia$Postwt) - 1
+g <- J(df) *
+  (mean(anorexia$Postwt - anorexia$Prewt)/
+     sd(anorexia$Postwt - anorexia$Prewt))
+g
+```
+
+We can correct the values of $d$ in the simulation above and show that the bias
+is reduced using $g$.
+
+```{r}
+# Convert Cohen's d to Hedges' g
+df <- N.1 + N.2 - 2
+g <- d * J(df)
+
+cat("The actual d=",real.d," and the mean of the sample of estimated gs is ",mean(g),".\n")
+```
+
+Plot the sampling distribution of $g$ with the true value of $d$ (in red) and
+the mean of $g$ (in blue).
+
+```{r}
+hist(g,breaks=50,freq=FALSE,xlim=c(-3,1))
+abline(v=c(real.d,mean(g)),col=c("red","blue"))
+```
+
+The bias is nearly eliminated using Hedges' correction.
+
+To compute Hedges' $g$ in R, you will use the cohens_d() command with the
+adjust=TRUE option or hedges_g(). Don't forget to tell each function whether the
+observations are paired.
+
+```{r}
+# Compute g for the anorexia data
+cohens_d(anorexia$Prewt,anorexia$Postwt,paired=TRUE,
+         adjust=TRUE)
+hedges_g(anorexia$Prewt,anorexia$Postwt,paired=TRUE)
+```
+
+You should use Hedges' $g$ to estimate the true effect size when your sample
+sizes are less than 20. Both Cohen's $d$ and Hedges' $g$ are equally accurate
+(but still biased) for sample sizes greater than 20.
+
+### 3. Your turn!
+
+Compute Hedges' $g$ for the samples you used to compute Cohen's $d$ in #2. How
+big were your sample sizes? Did anything change?
+
+> Insert your response here
+
+```{r}
+# Insert your code here
+```
+
+## Glass' $\Delta$
+
+Hedges' $g$ and Cohen's $d$ both assume that the two samples come from
+populations with equal variance, so the common population variance $\sigma^2$ is
+estimated by pooling the two sample variances.
+
+If it is known that the two population variances are different, Glass' $\Delta$
+should be used to estimate the effect size. For two independent samples, Glass'
+$\Delta$ is $$
+\Delta = \dfrac{\overline{X}_1 - \overline{X}_2}{s_1},
+$$ where Sample 1 (with mean $\overline{X}_1$ and variance $s^2_1$) is a control
+or referent group. The argument for using the control group's standard deviation
+is that the control group's parameters will not be affected by the treatment and
+therefore $s^2_1$ is a better estimate of the population variance $\sigma^2$.
+
+```{r}
+# Use the young group as the control
+Delta <- (mean(data$HEALTH[!young])-mean(data$HEALTH[young]))/sd(data$HEALTH[young])
+Delta
+```
+
+Compare this result to the output of glass_delta(), which uses the standard
+deviation of the second group as the "control."
+
+```{r}
+glass_delta(data$HEALTH[!young],data$HEALTH[young],adjust=FALSE)
+```
+
+If neither group is a control group and the variances of the groups are
+different, then the standard deviation is typically estimated by the square root
+of the averages of the variances, the estimate used by the Welch's $t$-test.
+
+```{r}
+mean.var <- mean(c(var(data$HEALTH[!young]),var(data$HEALTH[young])))
+w <- (mean(data$HEALTH[!young])-mean(data$HEALTH[young]))/sqrt(mean.var)
+w
+```
+
+As far as I know, the glass_delta() function does not permit this method.
+
+## Summary
+
+I mentioned above that these effect size statistics (Cohen's $d$, Hedges' $g$,
+and Glass' $\Delta$) are known as distance or $d$-measures of effect size. There
+are families of effect sizes for different kinds of tests. In addition to the
+distance measures there are correlation-based measures and measures for
+categorical data. We will cover these later.
+
+By way of guidelines:
+
+1.  Use Cohen's $d$ for independent samples when your sample sizes are larger.
+2.  Use Hedges' $g$ when they are smaller (less than 20).\
+3.  Use Glass' $\Delta$ when variances are unequal and the experiment has a
+    control group.
+
+# Relationship between effect sizes and power
+
+Reading: Howell Chapter 8 (Section 8.3)
+
+The estimation of effect sizes we have performed so far are *post hoc*: they are
+done after we have collected the data. We are asked to report these when we
+report the results of null hypothesizing so that other researchers can evaluate
+whether a significant result is meaningful or not.
+
+More importantly, effect sizes are used to determine the power of tests. That
+is, when we design an experiment, we want the tests we plan to perform to have
+reasonable *power* (we want the probability of rejecting a false null hypothesis
+to be high), and the most straightforward way to do that is to select sample
+sizes that guarantee that level of power for a fixed (smallest meaningful)
+effect size.
+
+# Power
+
+Readings:
+
+1.  Howell Chapter 8
+2.  Navarro [Effect
+    size](https://learningstatisticswithr.com/book/hypothesistesting.html#effectsize)
+3.  Cohen 1992 ["A Power
+    Primer"](https://www2.psych.ubc.ca/~schaller/528Readings/Cohen1992.pdf)
+
+Video: Khan Academy
+[Power](https://www.khanacademy.org/math/statistics-probability/significance-tests-one-sample/error-probabilities-and-power/v/introduction-to-power-in-significance-tests)
+
+In the last notebook we talked about mistakes. There are two kinds of mistakes
+we can make in null hypothesis testing. One is a Type I error: rejecting a null
+hypothesis when it is true. The other is failing to reject a null hypothesis
+when it is false. We recognize that the probabilities of each of these errors is
+conditional on the null and alternative distributions, respectively. The
+probability of a Type I error is $$
+Pr(\text{Reject } H_0 ~|~ H_0 \text{ True}) = \alpha,
+$$ and the probability of a Type II error is $$
+Pr(\text{Fail to reject } H_0 ~|~ H_0 \text{ False}) = \beta.
+$$ Power is the complement to a Type II error, the probability of rejecting
+$H_0$ given that it is false, or $1 - \beta$.
+
+We fix the probability of a Type I error by deciding that we will not reject the
+null for any $p$-value greater than $\alpha$. This is equivalent to specifying
+the minimum value of the test statistic required to reject the null.
+
+We can't fix the probability of either a Type II error or power because we don't
+know what the truth is. To compute $\beta$ we need to know what the mean of the
+alternative distribution is. Because we don't know that, instead we speculate
+about what the smallest meaningful effect size could be, and then talk about
+power relative to that effect size. Justifying the smallest meaningful effect
+size will require that you leverage your expertise about a particular problem.
+
+|    Decision    | $H_0$ True | $H_0$ False |
+|:--------------:|:----------:|:-----------:|
+| Fail to reject | $1-\alpha$ |   $\beta$   |
+|     Reject     |  $\alpha$  |  $1-\beta$  |
+
+*Table 2 from Tests of Means notebook. Probability of errors and correct
+decisions in null hypothesis testing.*
+
+The thing to remember about power is that the decision to reject or fail to
+reject a null hypothesis depends only on the null hypothesis and has nothing to
+do with the alternative or the "truth." To make assumptions about power (because
+they are just that, assumptions) we will need to make assumptions about the
+alternative hypothesis.
+
+When we introduced the idea of an effect size we wrote the null and alternative
+hypotheses as \begin{eqnarray*}
+H_0: && \mu = \mu_0 \text{ and }\\
+H_1: && \mu = \mu_1, \\
+\end{eqnarray*} explicitly stating a value $\mu_1$ for the alternative mean.
+Putting a value in the statement of $H_1$ tells us what the effect size is and
+allows us to compute power. Power is a function of three things:
+
+1.  Effect size,
+2.  Sample size, and
+3.  $\alpha$ level.
+
+To understand the role of each of these factors, we need to understand how the
+distribution of values of the test statistic are divided into regions where
+$H_0$ will fail to be rejected and where it will be rejected (the *rejection
+region*).
+
+```{r}
+# Plot of the null distribution
+z <- seq(-4,6,length=200)
+plot(z,dnorm(z),ylab="",xlab="Values of Test Statistic",
+     main="Null Distribution",type='l')
+
+# Mark the critical z value for alpha = 0.05
+abline(v=c(-1.96,1.96),h=0)
+
+# Shade the alpha level
+polygon(c(-4,-1.96,-1.96,rev(z[z<=-1.96])),
+        c(0,0,dnorm(-1.96),dnorm(rev(z[z<=-1.96]))),col="orange")
+polygon(c(1.96,1.96,z[z>=1.96],1.96),
+        c(0,dnorm(1.96),dnorm(z[z>=1.96]),0),col="orange")
+
+# Label the rejection region
+text(c(-3,3),c(.2,.2),"Reject")
+```
+
+The figure this code chunk generates shows the rejection region for a two-tailed
+$z$-test with $\alpha = 0.05$. Sample means with $z$-scores of magnitude greater
+than 1.96 are in the rejection region and have $p$-values less than $\alpha$;
+all others are not far enough from the null mean to reject $H_0$.
+
+Now consider a specific alternative: an effect size of 2.
+
+```{r}
+# Plot of the null and alternative distribution
+# See the comments in the chunk above for the plotting commands
+z <- seq(-4,6,length=200)
+plot(z,dnorm(z),ylab="",xlab="Values of Test Statistic",
+     main="Null and Alternative Distributions",type='l')
+
+# Add the alternative distribution
+lines(z,dnorm(z,2,1),lty=3)
+abline(v=c(-1.96,1.96),h=0)
+
+# Shade 1 - beta
+polygon(c(1.96,1.96,z[z>=1.96],1.96),
+        c(0,dnorm(1.96,2,1),dnorm(z[z>=1.96],2,1),0),col="purple")
+polygon(c(-4,-1.96,-1.96,rev(z[z<=-1.96])),
+        c(0,0,dnorm(-1.96),dnorm(rev(z[z<=-1.96]))),col="orange")
+polygon(c(1.96,1.96,z[z>=1.96],1.96),
+        c(0,dnorm(1.96),dnorm(z[z>=1.96]),0),col="orange")
+text(c(-3,3),c(.2,.2),"Reject")
+```
+
+Remember that the decision to reject $H_0$ is completely independent from the
+alternative distribution. It depends only on whether the test statistic falls in
+the rejection region or not. Power (shown in purple) is the area under the curve
+of the alternative that falls in the rejection region. The more we can push the
+alternative into the rejection region the higher power will be.
+
+### Effect size
+
+The bigger the effect size the higher power will be. This should be intuitive: a
+big effect should be easier to see than a small one. A big effect size results
+in more of the alternative distribution in the rejection region.
+
+```{r}
+# Plot of the null and alternative distribution
+# See the comments in the chunks above for the plotting commands
+z <- seq(-4,6,length=200)
+plot(z,dnorm(z),ylab="",xlab="Values of Test Statistic",
+     main="Null and Alternative Distributions",type='l')
+# Add a second alternative with larger effect size
+lines(z,dnorm(z,3,1),lty=1)
+abline(v=c(-1.96,1.96),h=0)
+polygon(c(1.96,1.96,z[z>=1.96],1.96),
+        c(0,dnorm(1.96,3,1),dnorm(z[z>=1.96],3,1),0),col="purple")
+polygon(c(-4,-1.96,-1.96,rev(z[z<=-1.96])),
+        c(0,0,dnorm(-1.96),dnorm(rev(z[z<=-1.96]))),col="orange")
+polygon(c(1.96,1.96,z[z>=1.96],1.96),
+        c(0,dnorm(1.96),dnorm(z[z>=1.96]),0),col="orange")
+lines(z,dnorm(z,2,1),lty=3)
+text(c(-3,3),c(.2,.2),"Reject")
+```
+
+The figure generated by the code chunk above shows two alternatives, one with an
+effect size of 2 (dotted line) and the other with an effect size of 3. The
+alternative associated with the larger effect size has more of its area in the
+rejection region and hence has higher power.
+
+### Alpha level
+
+Increasing the $\alpha$-level increases power because it decreases the size of
+the interval where we would fail to reject $H_0$.
+
+```{r}
+# Plot of the null and alternative distribution
+# See the comments in the chunks above for the plotting commands
+z <- seq(-4,6,length=200)
+plot(z,dnorm(z),ylab="",xlab="Values of Test Statistic",
+     main="Null and Alternative Distributions",type='l')
+lines(z,dnorm(z,3,1),lty=1)
+abline(v=c(-1.96,1.96),h=0,lty=3)
+abline(v=c(-1.645,1.645),h=0) # add boundaries for the new alpha level
+polygon(c(1.96,1.96,z[z>=1.96],1.96),
+        c(0,dnorm(1.96,3,1),dnorm(z[z>=1.96],3,1),0),col="purple")
+
+# Shade the new alpha levels
+polygon(c(-4,-1.645,-1.645,rev(z[z<=-1.645])),
+        c(0,0,dnorm(-1.645),dnorm(rev(z[z<=-1.645]))),col="yellow")
+polygon(c(1.645,1.645,z[z>=1.645],1.645),
+        c(0,dnorm(1.645),dnorm(z[z>=1.645]),0),col="yellow")
+polygon(c(-4,-1.96,-1.96,rev(z[z<=-1.96])),
+        c(0,0,dnorm(-1.96),dnorm(rev(z[z<=-1.96]))),col="orange")
+polygon(c(1.96,1.96,z[z>=1.96],1.96),
+        c(0,dnorm(1.96),dnorm(z[z>=1.96]),0),col="orange")
+
+# Shade the increase in power
+polygon(c(1.645,1.645,z[z>=1.645 & z <=1.96],1.96,1.96,1.645),
+        c(0,dnorm(1.645,3,1),
+          dnorm(z[z>=1.645 & z<=1.96],3,1),
+          dnorm(1.96,3,1),0,0),angle=45,density=50)
+text(c(-3,3),c(.2,.2),"Reject")
+```
+
+In the figure above, $\alpha$ has been raised from 0.05 (dotted vertical lines)
+to 0.10 (solid vertical lines). The yellow area is the increase in the area
+under the null distribution in the rejection region. The width of the rejection
+region is reduced from [-1.96,1.96] to [-1.645,1.645]. Consequently, the area
+under the alternative distribution is increased by adding the hatched area
+between 1.645 and 1.96 to the purple area.
+
+To increase the size of the rejection region without increasing $\alpha$ and the
+probability of a Type I error, *perform one-tailed tests instead of two-tailed
+tests*. The figure above shows movement of the upper critical value from 1.96
+(area 0.025 in the upper tail as for a two-tailed test with $\alpha=0.05$) to
+1.645 (area 0.05 in the upper tail as for a one-tailed test with $\alpha=0.05$).
+
+### Sample size
+
+The silver bullet for increasing power is increasing the sample size. The reason
+for this is how the standard error of the mean decreases with sample size: $$
+\sigma_{\overline{X}} = \dfrac{\sigma}{\sqrt{N}}.
+$$ Decreasing the variance of the sampling distribution of $\overline{X}$
+increases the area under the alternative distribution in the rejection region.
+
+```{r}
+# Plot of the null and alternative distribution
+# See the comments in the chunks above for the plotting commands
+z <- seq(-4,6,length=200)
+plot(z,dnorm(z,0,.5),ylab="",xlab="Values of Test Statistic",
+     main="Null and Alternative Distributions",type='l')
+
+# Plot the new boundaries of the rejection region
+abline(v=c(-1.96/2,1.96/2),lty=c(1,1))
+lines(c(-1.96,-1.96,1.96,1.96),c(.6,0,0,.6),lty=3)
+polygon(c(1.96,1.96,z[z>=1.96],1.96),
+        c(0,dnorm(1.96,3,1),dnorm(z[z>=1.96],3,1),0),lty=3,col="gray80")
+lines(z,dnorm(z,3,.5),lty=1)
+
+# Shade the new alpha
+polygon(c(-4,-1.96/2,-1.96/2,rev(z[z<=-1.96/2])),
+        c(0,0,dnorm(-1.96/2,0,.5),
+          dnorm(rev(z[z<=-1.96/2]),0,.5)),col="yellow")
+polygon(c(1.96/2,1.96/2,z[z>=1.96/2],1.96/2),
+        c(0,dnorm(1.96/2,0,.5),dnorm(z[z>=1.96/2],0,.5),0),col="yellow")
+
+polygon(c(-4,-1.96,-1.96,rev(z[z<=-1.96])),
+        c(0,0,dnorm(-1.96),dnorm(rev(z[z<=-1.96]))),col="orange")
+polygon(c(1.96,1.96,z[z>=1.96],1.96),
+        c(0,dnorm(1.96),dnorm(z[z>=1.96]),0),col="orange")
+
+# Shade the new power
+polygon(c(1.96/2,1.96/2,z[z>=1.96/2],1.96/2),
+      c(0,dnorm(1.96/2,3,.5),dnorm(z[z>=1.96/2],3,.5),0),angle=45,density=50)
+lines(z,dnorm(z,3,1),lty=3)
+lines(z,dnorm(z,0,1),lty=3)
+text(c(-2,2),c(.75,.75),"Reject")
+```
+
+This figure shows the rejection region and power for sample size $N$. The dotted
+lines mark the boundaries of the original rejection region and the sampling
+distributions under the null and alternative hypotheses. The area under the null
+distribution shaded in orange shows the $\alpha$ level of 0.05.
+
+The solid lines show the rejection region and sampling distributions under the
+null and alternative hypothesis for sample size $4N$. The $\alpha$ level is
+still 0.05 (shown in yellow) and power is shown as the hatched area under the
+alternative distribution in the new rejection region.
+
+You should see two things that increasing the sampling size and decreasing the
+standard error of the sampling distribution has done. First, the rejection
+region is much larger; the null distribution is tighter around the null mean so
+that the test statistic can be rejected for much smaller values. Second, the
+alternative distribution is also much tighter and now most of the area under
+this distribution is contained in the new rejection region.
+
+### Dependent vs. Independent Sample Designs
+
+Any manipulation that decreases the variance of the sampling distribution will
+have large effects on power. Remember that the variance of the difference of two
+means for correlated samples is $$
+\sigma^2_{\overline{X} - \overline{Y}} = \sigma^2_{\overline{X}} + \sigma^2_{\overline{Y}} - 2 \rho_{XY} \sigma_{\overline{X}}\sigma_{\overline{Y}},
+$$ where $\rho$ is the population correlation coefficient between $X$ and $Y$.
+(Note that the correlation between $X$ and $Y$ is equal to the correlation
+between $\overline{X}$ and $\overline{Y}$.) Because $\rho$ is almost certainly
+positive for dependent designs, the variance of the mean difference will be much
+less than the sum of the variances. The sum of the variances is the variance of
+the mean difference for independent sample designs.
+
+Therefore, one way to increase power is to conduct experiments with dependent
+samples, if it is feasible to do so.
+
+# Noncentrality Parameter
+
+Readings:
+
+1.  Howell [Confidence intervals on effect
+    sizes](https://www.uvm.edu/~statdhtx/StatPages/ConfIntEffectSize/Confidence%20limit%20on%20effect%20size.html)
+    (you can skip to the noncentrality parameter stuff but the whole text is
+    pretty interesting and, as is Howell$^*$, very well written and entertaining
+    to read)
+2.  [Noncentrality
+    parameters](https://en.wikipedia.org/wiki/Noncentral_distribution)
+
+$^*$*While writing up this notebook I learned that David Howell passed away in
+2018. This makes me very sad, because he wrote the best statistics textbooks for
+psychologists (and everyone else). I can only imagine that as a person he was as
+wonderful as was his ability to explain difficult concepts in an approachable
+and clear way, without oversimplification.*
+
+Many tools for power analysis make use of the noncentrality parameter. A
+noncentrality parameter quantifies the difference between the sampling
+distributions under the null and alternative distributions. It will differ
+depending on the sampling distribution under consideration. In this section I
+will explain what the noncentrality parameter is for the $z$ distribution and
+its relationship to effect size.
+
+The problem arises when we move away from the normal sampling distribution to
+something else, like the $t$-distribution. The $t$-distribution can't be slid
+back and forth to different means in the way the normal distribution can. When
+the $t$-distribution has a mean that is not equal to zero its variance and
+skewness changes as well. A "noncentral" $t$ is the distribution of the
+$t$-statistic when the null hypothesis is false.
+
+```{r}
+t <- seq(-4,10,length=200)
+# Central t
+plot(t,dt(t,10),xlab="Values of T",ylab="",type='l',
+     main="Central vs. Noncentral T Distributions")
+
+# Noncentral t
+lines(t,dt(t,10,ncp=4))
+```
+
+We can illustrate the meaning and importance of the noncentrality parameter with
+the normal distribution of the $z$ statistic $$
+Z = \dfrac{\overline{X} - \mu_0}{\sigma/\sqrt{N}},
+$$ where $\mu_0$ is the value of the population mean specified in the null
+hypothesis. If $H_0$ is true, the expected value of $Z$ is zero, because
+$E[\overline{X}] = \mu_0$. However, if the null hypothesis is false, then
+$E[\overline{X}] = \mu_1$, where $\mu_1$ is some other unknown mean, and so $$
+E \left[ \dfrac{\overline{X} - \mu_1}{\sigma/\sqrt{N}} \right] = 0.
+$$
+
+If the true population mean is $\mu_1$, then
+
+\begin{eqnarray*}
+E[Z] & = & E \left[ \dfrac{\overline{X} - \mu_0}{\sigma/\sqrt{N}} \right] \\
+ \text{(add 0)}& = & E \left[ \dfrac{\overline{X} - \mu_1 + \mu_1 - \mu_0}{\sigma/\sqrt{N}} \right] \\
+ & = & E \left[ \dfrac{\overline{X} - \mu_1}{\sigma/\sqrt{N}} \right] + E \left[ \dfrac{\mu_1 - \mu_0}{\sigma/\sqrt{N}} \right] \\ 
+ & = & \dfrac{\mu_1 - \mu_0}{\sigma/\sqrt{N}}.
+ \end{eqnarray*}
+
+The quantity $\dfrac{\mu_1 - \mu_0}{\sigma/\sqrt{N}}$ is the noncentrality
+parameter $\delta$. We express $\delta$ as a function of the effect size $d$: $$
+\delta = \dfrac{\mu_1 - \mu_0}{\sigma/\sqrt{N}} = d \sqrt{N}.
+$$
+
+Reread the effect size section above. Note that when we estimate $d$ the
+estimate of the noncentrality parameter is exactly equal to the test statistic
+($z$ or $t$ computed on the basis of the sample mean(s) and variance(s)). So you
+might wonder why we're making a fuss about this -- complexifying it, if you
+please.
+
+However, $\delta$ is not the same as the test statistic. The noncentrality
+parameter is not something that we estimate from the data; it is something that
+we compute for a given (desired) effect size. So when we say that we are
+considering an effect size of $d$ then the noncentrality parameter is the
+quantity that determines power -- power that is to be computed *before* we
+collect or look at the data.
+
+For the $z$- and $t$-tests we have considered, the noncentrality parameters are
+written as a function of the effect size $d$ as in the table below. Different
+test statistics will have different noncentrality parameters.
+
+|          Test          |   Noncentrality Parameter    |
+|:----------------------:|:----------------------------:|
+|          $z$           |         $d \sqrt{N}$         |
+|     One sample $t$     |         $d \sqrt{N}$         |
+|  Dependent sample $t$  |         $d \sqrt{N}$         |
+| Independent sample $t$ | $d \sqrt{1/(1/N_1 + 1/N_2)}$ |
+
+*Table 3. Noncentrality parameters for tests of means.*
+
+# Power Computations
+
+Readings:
+
+1.  Howell Chapter 8 (Sections 8.3-8.6)
+2.  [Power Computations in
+    R](https://www.r-bloggers.com/2021/05/power-analysis-in-statistics-with-r/) -
+    note that I am using the package pwrss for our class. This is a nice
+    description of how to use the pwr package, which is an alternative.
+
+Video: [Statistical power and sample size
+calculations](https://www.youtube.com/watch?v=hfwBT3vXnRI)
+
+With a good understanding of what effect sizes and noncentrality parameters are
+and the factors that influence power, we can now perform power analyses. To be
+more precise, for a power analysis we will specify a *minimum* effect size that
+we want to be able to detect with some level of power, and we usually aim to
+determine the sample size that will guarantee that power. You should not be
+surprised to read that your expertise is what will determine what that minimum
+effect size is.
+
+We'll start by outlining a power computation for a $z$-test and then apply that
+to a $z$-test of proportions. Then we'll use R to perform power analyses for the
+different $t$-tests we've been working with.
+
+## $z$-Test Power
+
+Let's pretend that we are measuring the number of days required to train a
+rhesus monkey to perform a task. Under ordinary circumstances it will take on
+average 100 days. We suspect that entorhinal cortex is involved with learning
+this particular task, so we will measure the number of days to train monkeys
+after lesioning this area. Our null and alternative hypotheses are
+\begin{eqnarray*}
+H_0: && \mu = 100 \text{ and } \\
+H_1: && \mu = 200,
+\end{eqnarray*} for a one-tailed test using an $\alpha$-level of 0.05.
+
+We obtain a sample of size $N=16$ monkeys with lesioned entorhinal cortex and
+somehow we know that the standard deviation of the number of days to learn the
+task is $\sigma = 200$. We train the monkeys and observe a mean number of days
+$\overline{X}$. We compute the test statistic $$
+Z = \dfrac{\overline{X} - 100}{200/\sqrt{16}},
+$$ and compare that to the critical value of $\overline{X}$ determined by
+$\alpha=0.05$.
+
+```{r}
+# Plot two distributions with two axes each
+z <- seq(-4,8,length=300) # for plotting
+plot(z,dnorm(z)+1.5,ylim=c(-.5,2),xlim=c(-3,5),
+     xlab="",type='l',ylab="",axes=FALSE,fin=c(2,6)) # null distribution
+abline(h=c(-.5,0,1,1.5),v=c(1.645)) # axis lines
+lines(z,dnorm(z,2,1)) # alternative distribution
+
+# 4 axes
+axis(1,at=seq(-2,4,by=1),labels=seq(0,300,by=50),pos=1.5)
+axis(1,at=seq(-2,4,by=1),labels=TRUE,pos=1)
+axis(1,at=seq(-2,4,by=1),labels=seq(0,300,by=50),pos=0)
+axis(1,at=seq(-2,4,by=1),labels=seq(-4,2,by=1),pos=-.5)
+
+# Shade alpha and 1 - beta
+polygon(c(1.645,1.645,z[z>1.645],1.645),1.5+c(0,dnorm(1.645),dnorm(z[z>1.645]),0),col="orange")
+polygon(c(1.645,1.645,z[z>1.645],1.645),c(0,dnorm(1.645,2,1),dnorm(z[z>1.645],2,1),0),col="purple")
+
+# Label the axes
+text(c(5,5,5,5),.15+c(-.5,0,1,1.5),c("D","C","B","A"))
+```
+
+This figure above shows two distributions, the null with mean 100 days and the
+alternative with mean 200 days. There are 4 x-axes. Axes A and C are the same
+and represent the values of the sample mean on the scale of the measured
+variable, number of days to learn the task. Axis B shows the $z$-scores of the
+values of the sample mean under the null hypothesis. Axis D shows the $z$-scores
+of the values of the sample mean under the alternative. Note that the null mean
+on Axis A has $z$-score 0 on Axis B and the alternative mean on Axis C has
+$z$-score 0 on Axis D; remember that the $z$-axes indicates how many standard
+deviations a value is away from the distribution's mean. The $\alpha$ level of
+0.05 is the area under the null distribution is shaded as orange. The vertical
+line marks the beginning of the rejection region: any sample mean obtained to
+the right of the vertical line (or any $z$-statistic greater than 1.645) will
+have a $p$-value less than $\alpha=0.05$ and will lead to rejecting the null
+hypothesis.
+
+The critical $z$-value, 1.645, is easy to look up in a table or to obtain in R
+with the command qnorm(0.95). To compute power, we need to figure out what the
+value of $\overline{X}_C$ is on the original scale of the measurement (days, not
+standard deviations). When we determine that value we can compute the new
+$z$-score with respect to the alternative distribution (Axis D).
+
+For $\alpha=0.05$, we move from Axis B to A, $$
+\overline{X}_C = \mu_0 + 1.645 \dfrac{\sigma}{\sqrt{N}} = 100 + 1.645 \dfrac{200}{\sqrt{16}} = 182.25.
+$$ Now we drop the value 182.25 down to Axis C. With respect to the alternative,
+$$
+z_{\overline{X}_C} = \dfrac{182.25 - 200}{200/\sqrt{16}} = -0.355.
+$$ Power, the area shaded in purple, is the probability of obtaining a sample
+mean with a $z$-score greater than -0.355. We can find this with the pnorm
+command.
+
+```{r}
+1 - pnorm(-.355)
+```
+
+We see that the power of this test is slightly less than 64%. R has a command
+for this in the pwrss package that will require computation of a noncentrality
+parameter:
+
+```{r}
+# Distribution parameters
+mu.0 <- 100
+mu.1 <- 200
+sigma <- 200
+N <- 16
+
+# Compute the ncp
+d <- (mu.1 - mu.0)/sigma # effect size
+ncp <- d * sqrt(N) # noncentrality parameter
+
+# Compute power
+power.z.test(ncp=ncp,alpha=0.05,alternative="one.sided")
+```
+
+The pwrss library produces really nice plots!
+
+### 4. Your turn!
+
+Compute the power of a $z$-test against an alternative with effect size of 0.80,
+sample size $N=10$, and $\alpha=0.01$. Then vary these parameters. Try different
+effect sizes, sample sizes, and alpha levels.
+
+```{r}
+# Insert your code here
+```
+
+### Power of Test of Proportions
+
+We have discussed before that the one situation in which we know the population
+variance $\sigma^2$ is for tests of proportions. I'll walk through how to test
+the difference between two proportions in R.
+
+Consider the GSS dataset. Let's look at the proportion of respondents who
+endorse the attitude that young people should respect the opinion of their
+elders as a function of whether the respondent is older or younger. We'll
+perform a median split on age to separate the respondents into younger and older
+groups and compute the proportion of agreements within each group. Because the
+overall proportion of agreement in the dataset is 0.39,
+
+```{r}
+mean(data$YOUNGEN==1)
+```
+
+we would expect the younger and older proportions to approximately equal 0.39 if
+there is no difference between the groups. However, I suspect that younger
+respondents will disagree with this sentiment more frequently than older
+respondents. So the null and alternative hypotheses will be \begin{eqnarray*}
+H_0: && \pi_{\text{Young}} = \pi_{\text{Old}} \text{ and} \\
+H_1: && \pi_{\text{Young}} < \pi_{\text{Old}}\\
+\end{eqnarray*} for young and old population proportions $\pi_{\text{Young}}$
+and $\pi_{\text{Old}}$.
+
+What is the power of this test?
+
+The power.z.twoprops() function requires that you tell it what proportions you
+expect in each group and the sample sizes of each group, the direction of the
+test and the alpha level.
+
+```{r}
+# Separate the respondents into two groups and pull out the attitude variable
+young <- data$AGE <= median(data$AGE)
+attitude <- data$YOUNGEN
+
+# Compute the sample sizes
+N.1 <- sum(young)
+N.2 <- sum(!young)
+kappa <- N.1/N.2 # Ratio of sample sizes
+
+# Compute the observed proportions for each group
+p.1 <- mean(attitude[young]==1)
+p.2 <- mean(attitude[!young]==1)
+
+power.z.twoprops(p.1,p.2,n.ratio=kappa,alpha=0.05,alternative='one.sided',n2=N.2)
+```
+
+This is a post hoc power analysis: we already observed the proportions and we
+have the sample sizes, so those were the values we passed into the function. We
+can also use this function to determine necessary sample sizes to produce a
+given level of power.
+
+```{r}
+power.z.twoprops(p.1,p.2,n.ratio=kappa,alpha=0.05,alternative="one.sided",power=0.80)
+```
+
+For the observed proportions and ratio of sample sizes we have for the young x
+attitude data, we need 172 young people and 162 older people to achieve power of
+0.80.
+
+## One Sample $t$-Test
+
+As I introduced earlier, computing power for the $t$ test is more difficult than
+for the $z$ test because the shape of the distribution under the alternative
+hypothesis is different than that under the null hypothesis. The shape of the
+alternative distribution is determined by the noncentrality parameter, which for
+the one-sample $t$-test is $d \sqrt{N}$. Power computations or sample size
+determinations have to be solved numerically (using an algorithm) rather than
+explicitly like we did for the normal distribution in the $z$-test above.
+
+You can [use a table or graph](https://nvlpubs.nist.gov/nistpubs/jres/66B/jresv66Bn2p59_A1b.pdf) to determine the power of a $t$-test or use R. The R commands to determine power and sample size are power.t.test(), power.t.student() and power.t.welch(). *Note that power.t.test() is also the name of a similar function in the "built in" stats package and I will be working with the power.t.test() command in the pwrss package. When you load the pwrss package it will warn you that the power.t.test() command has been overwritten. If you want to use the original, call it with stats::power.t.test().*
+
+```{r}
+# Compute power for a medium effect size and 20 observations, with alpha = 0.01 and a one-tailed test
+ncp <- 0.5 * sqrt(20)
+power.t.test(ncp=ncp,df=19,alpha=0.01,alternative="one.sided")
+```
+
+The function returns power $1-\beta = 0.40$ for a one-tailed test with a sample
+size $N=20$, $\alpha=0.01$, and medium effect size $d=0.50$. We can examine
+power for a range of different sample sizes.
+
+```{r}
+# Compute power for a range of sample sizes
+N <- 20:50
+ncp <- 0.5*sqrt(N) # the noncentrality parameter depends on N
+one.minus.beta <- vector()
+# Note that only one of ncp, df, or alpha can be vector valued and that for multiple outputs plot=FALSE
+for (i in 1:length(N))
+    one.minus.beta[i] <- power.t.test(ncp=0.5*sqrt(N[i]),df=N[i]-1,alpha=0.01,
+                        alternative="one.sided",plot=FALSE,verbose=FALSE)['power']
+cbind(N,ncp,one.minus.beta)
+```
+
+We see from this output that we don't reach power $1-\beta = 0.80$ (a value as
+ubiquitous as $\alpha=0.05$) until the sample size reaches $N=43$.
+
+Let's compare this result to the output of the power.t.student() function, which
+will compute explicitly the necessary sample size for the specified experimental
+parameters. Recall that we want $\alpha=0.01$ and power $1-\beta=0.80$ for a one
+tailed test, and we want to be able to detect a medium effect size $d = 0.50$.
+
+```{r}
+power.t.student(d=0.5,alpha=0.01,power=0.8,alternative="one.sided",design="one.sample")
+```
+
+The function returns the same sample size $N=43$ that we observed as a result of
+computing power over a range of values for $N$.
+
+## Two Independent Samples $t$-Test
+
+Now let's consider the two independent samples test. Suppose we want
+$\alpha=0.01$ and power $1-\beta=0.80$ for a one tailed test, and we want to be
+able to detect a medium effect size.
+
+```{r}
+power.t.student(d=0.5,n.ratio=1,alpha=0.01,power=0.8,alternative="one.sided")
+```
+
+I refer you to the [R documentation](https://cran.r-project.org/web/packages/pwrss/pwrss.pdf) for the power.t functions as they are somewhat complicated.
+
+```{r}
+# This will give the same result as above if var.ratio=1 (the default) because if the 
+# standard deviations of the two groups are equal and the sample sizes are equal 
+# (as they are in this case) the Satterthwaite correction is equal to 1.
+power.t.welch(d=0.5,n.ratio=1,var.ratio=1,alpha=0.01,power=0.8,alternative="one.sided")
+```
+
+## 5. Your turn!
+
+Perform a (post-hoc) power analysis for at least one of the $t$-tests you
+performed on your own data. Is your study underpowered? If so, how will you move
+forward with it?
+
+> Insert your response here
+
+```{r}
+# Insert your code here
+```
+
+# Final Remarks About Power
+
+Readings:
+
+1.  Navarro
+    [Traps](https://learningstatisticswithr.com/book/hypothesistesting.html#traps)
+2.  Howell Chapter 8 (Section 8.10)
+
+There has been growing emphasis on conducting and reporting the results of power
+analyses in the psychological and social science literature. However, many
+researchers still [do not have a strong
+grasp](https://online.ucpress.edu/collabra/article/7/1/28250/118714/Using-and-Understanding-Power-in-Psychological)
+on how power analyses should be conducted and the role that they play in
+experimental design and statistical decision making. This is particularly
+troubling given that [many of the effect sizes in the discipline are
+small](https://psycnet.apa.org/fulltext/2018-22294-001.pdf), and so a vast
+number of published studies [appear to be
+underpowered](https://journals.plos.org/plosbiology/article?id=10.1371/journal.pbio.2000797).
+
+With the [replication
+crisis](https://journals.plos.org/plosmedicine/article/file?id=10.1371%2Fjournal.pmed.0020124&type=printable)
+as the wind in their sails, some researchers have suggested ["policing"
+published reports for Type I errors](https://pubmed.ncbi.nlm.nih.gov/17715249/)
+or [evaluating journal
+quality](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0109019)
+by performing post hoc power analyses. In 2002 [Posavac even
+suggested](https://psycnet.apa.org/record/2004-12713-003) that post hoc power
+can be substituted as the probability of future replication of a study's
+results. The problem with these "forensic" uses of power analysis is that they
+are based on *estimated* rather than actual effect sizes. Recall from above that
+we estimate $d=|(\mu_1 - \mu_0)/\sigma|$ for a $t$-test with
+$|(\overline{X}-\mu_0)/s|$. The fact that we must estimate the effect sizes from
+the sample statistics means that there is sampling variability in $d$ (which
+should probably be written as $\hat{d}$ but here we are). There is also
+variability in $d$ in the population (a Bayesian concept).
+
+It is well-known but under-appreciated that post-hoc power analyses are of
+little practical use, especially for ferreting out Type I errors or $p$-hacking,
+because of this variability. [Andrew
+Gelman](https://journals.lww.com/annalsofsurgery/fulltext/2019/08000/comment_on__post_hoc_power_using_observed_estimate.81.aspx),
+[Tukey](https://psycnet.apa.org/fulltext/1969-08913-001.pdf), and more recently
+[Pek et al.](https://psycnet.apa.org/record/2025-25220-001), among many others
+have explained in some detail that post-hoc power computations are merely
+mathematical restatements of the $p$-value and can't be used in the way aspiring
+research police have recommended (e.g., [the
+"p-curve"](https://www.p-curve.com/) is especially problematic). I personally
+worry that the threat of these kinds of forensics will hinder scientific
+progress and smear the reputation of good researchers or, ironically, force
+otherwise good researchers into doing bad science for fear of bringing down the
+wrath of research police (see
+[Lakens](https://daniellakens.blogspot.com/2014/12/observed-power-and-what-to-do-if-your.html)
+for some guidance).
+
+Power analysis is most useful before an experiment is run, during the experiment
+design process. It is useful because it forces researchers to think about what
+effect sizes might be and whether one- or two-tailed hypothesis tests are most
+appropriate, and it helps in determining appropriate sample sizes. Even before
+data collection, however, the utility of power analysis is limited ([Pek et al.
+2024](https://psycnet.apa.org/fulltext/2024-72712-002.pdf)). Do not fall into
+the trap of mechanically conducting power analysis and believing that, having
+done so, you will obtain some desired level of power or in some other way
+legitimized your experimental design. If you have learned nothing else in this
+class, it should be that statistical analyses are *not* black boxes into which
+you can pour your data, turn a crank, and get accurate results or make good
+decisions based solely on what comes out of the box. Good statistical practice
+requires *thought* and *understanding* of the limitations of these analyses.
+
+[Whew.](https://www.grunge.com/img/gallery/the-origin-behind-the-phrase-get-on-your-soapbox/intro-1637694645.webp)
+
+# 6. Challenge: Back to Confidence Intervals
+
+Suppose you want a sample size that will ensure that the mean of a sample will
+be within one standard deviation of the population mean with some probability
+$1 - \alpha$. That is, $\mu - \sigma < \overline{X} < \mu + \sigma$. We can do
+this without needing to know what $\sigma$ is.
+
+First, using a bit of algebra, it is easy to show that
+$\mu - \sigma < \overline{X} < \mu + \sigma$ is equivalent to
+$\overline{X} - \sigma < \mu < \overline{X} + \sigma$. So if
+$Pr(\mu - \sigma < \overline{X} < \mu + \sigma) = 1 - \alpha$ then
+$Pr(\overline{X} - \sigma < \mu < \overline{X} + \sigma) = 1 - \alpha$.
+
+We know that the expression for a $1-\alpha$ confidence interval is $$
+Pr(\overline{X} - z_{\alpha/2} \dfrac{\sigma}{\sqrt{N}} < \mu < \overline{X} + z_{\alpha/2} \dfrac{\sigma}{\sqrt{N}}) = 1 - \alpha,
+$$ and we want $$
+Pr(\overline{X} - \sigma < \mu < \overline{X} + \sigma) = 1 - \alpha.
+$$ Therefore $$
+\sigma = z_{\alpha/2} \dfrac{\sigma}{\sqrt{N}}
+$$ and $\sigma$ cancels out on both sides! So it doesn't matter that we don't
+know what it is.
+
+Solving for $N$ we get $$
+N \ge (z_{\alpha/2})^2.
+$$
+
+More generally, if we want our sample mean to be within $w$ standard deviations
+of the true population mean with probability $1-\alpha$, we will need a sample
+of size $$
+N \ge \left( \dfrac{z_{\alpha/2}}{w} \right)^2.
+$$
+
+Pick one of the variables in your dataset and justify what an insignificant
+difference would be between a sample mean and the true population mean. (For
+example, for an IQ test with mean 100 and standard deviation 10, an
+uninteresting difference might be anything less than 5 points or $0.5\sigma$.)
+Determine what the sample size would be to place the sample mean within this
+distance from the true mean with 99% probability.
+
+> Insert your response here
+
+# 7. Your turn!
+
+Answer the following questions in the context of your own dataset.
+
+1.  What effect sizes are important for your experiments?
+2.  Is the number of observations in your dataset adequate to detect the effect
+    sizes you are interested in? How did you determine this?
+3.  What are the limitations of your study related to power or effect size, and
+    how do they influence your confidence in your results?
+4.  Think about what you've done in this notebook.
+    a.  What was the most important thing you learned?
+    b.  What was the hardest concept to understand?
+    c.  What surprised you the most?
+
+> Insert your responses here
+
+```{r}
+# Insert your code here
+```
+
+# 8. Challenge: Sequential Analysis
+
+This challenge doesn't have anything to do with effect size or power, but rather
+the probability of a Type I error.
+
+One of you asked me a really good question. It involved strategies for adding
+data to a study after a null result without having to rerun the whole study as I
+stated in class. The idea is to reduce the $\alpha$-level with each augmentation
+of the sample size to compensate for the increase in Type I errors that occurs
+when you decide to keep sampling after a null result. (This is sometimes called
+"peeking," the idea being that you are just checking to see if your results are
+significant before you've collected all the data you intend to analyze.) Let's
+see via simulation how this might work in the context of a two
+independent-samples $t$-test.
+
+Suppose first that the null hypothesis is true and there is no difference
+between the means of two groups. We'll generate two large datasets and examine
+them in increments.
+
+```{r}
+# Initialize simulation parameters
+bignum <- 10000
+max.N <- 1000 # largest sample size
+N <- 20 # smallest sample size
+
+# Population parameters
+mu <- 100
+sigma <- 10
+
+alpha <- 0.05
+
+###### First step
+# Generate data (H0 is true)
+X.1 <- rnorm(max.N,100,10)
+X.2 <- rnorm(max.N,100,10)
+
+# Initialize vectors to hold p-values and sample sizes
+p.value <- vector()
+sample.size <- vector()
+
+# Perform the first test
+p.value[1] <- t.test(X.1[1:N],X.2[1:N])$p.value
+sample.size[1] <- N
+```
+
+If this first test is insignificant we will increase $N$, adding the new
+observations to the old, and redo the test. If it is significant (a Type I
+error), we'll stop. We'll continue to increase $N$ until we get a significant
+difference or until we hit the maximum value of $N$ (max.N = 1000, in the code
+chunk above). We'll simulate this process a large number of times (bignum) and
+across all those bignum times we'll compute the proportion of Type I errors.
+
+```{r}
+for (i in 1:bignum) {
+   N <- 0 # reset N
+   p.value[i] <- 1
+   
+   # Generate the data (H0 is true)
+   X.1 <- rnorm(max.N,100,10)
+   X.2 <- rnorm(max.N,100,10)
+   
+   # Keep adding observations until the test is significant or we reach the 
+   # maximum sample size
+   while((N <= max.N) & (p.value[i]>alpha)) {
+       N <- N + 20 # Add 20 more to the sample
+       sample.size[i] <- N
+       p.value[i] <- t.test(X.1[1:N],X.2[1:N])$p.value
+   }
+}
+# Compute the Type I error rate
+cat("The actual probability of a Type I error is ",mean(p.value <=alpha))
+```
+
+The probability of a Type I error induced by "peeking" is much, much higher than
+$\alpha$.
+
+Now the question that was asked is whether we can reduce the probability of a
+Type I error to something acceptable by changing the values of $\alpha$. The
+[Bonferroni correction](https://en.wikipedia.org/wiki/Bonferroni_correction)
+divides $\alpha$ by the number of tests performed and is the standard method for
+bringing the error rate down. Let's redo the simulation, making $\alpha$ smaller
+with each comparison.
+
+```{r}
+for (i in 1:bignum) {
+   N <- 0 # reset N
+   p.value[i] <- 1
+   n.test <- 1 # reset number of tests performed
+   X.1 <- rnorm(max.N,100,10)
+   X.2 <- rnorm(max.N,100,10)
+   # Note the Bonferroni correction to alpha:
+   while((N <= max.N) & (p.value[i]>alpha/n.test)) {
+       N <- N + 20
+       sample.size[i] <- N
+       p.value[i] <- t.test(X.1[1:N],X.2[1:N])$p.value
+       n.test <- n.test + 1 # keep track of the number of tests
+   }
+}
+cat("The actual probability of a Type I error is ",mean(p.value <=alpha))
+```
+
+While smaller than before, the probability of a Type I error is still
+approximately double what it should be. So the Bonferroni correction is not
+sufficient to bring the Type I error rate down to an acceptable level.
+
+The addition of observations to a dataset after hypothesis testing is called
+sequential analysis, or sometimes dynamic data collection. To avoid inflation of
+the Type I error rate you need to specify in advance a *stopping rule* and there
+are other constraints (such as constant increments in sample size) that you may
+need to engage. You should also be aware that the definition of a $p$-value in a
+sequential analysis is different than that in a one-step null hypothesis test.
+
+So here's the challenge: The reduction in $\alpha$ necessary to bring the Type I
+error rate down to 0.05 (or whatever) is going to be a function of $N$ (both the
+minimum sample size and the increment to the sample size with each
+nonsignificant test). I encourage you to play around with these values. Can you
+generate a table or graph that illustrates a strategy for reducing $\alpha$ that
+might be useful for a sequential analysis?
+
+```{r}
+# Insert your code here
+```
+
+*How to perform a sequential analysis is beyond the scope of this notebook. I
+refer you to [this
+reference](https://www.ncss.com/wp-content/themes/ncss/pdf/Procedures/NCSS/Group-Sequential_Analysis_for_Two_Means_with_Known_Variances.pdf)
+for more information, if this is a method that might be important to you.*

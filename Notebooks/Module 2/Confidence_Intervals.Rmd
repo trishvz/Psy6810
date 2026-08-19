@@ -1,0 +1,950 @@
+---
+title: "Module 2 - Confidence Intervals"
+author: "TVZ"
+output:
+  word_document:
+    toc: true
+    toc_depth: '3'
+  pdf_document:
+    toc: true
+    toc_depth: 3
+  html_document:
+    df_print: paged
+    toc: true
+    toc_depth: 3
+editor_options:
+  markdown:
+    wrap: 80
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Upload the libraries used in this document
+library("ggplot2")
+library("tinytex")
+library("extraDistr")
+library("sysid")
+library("DescTools")
+```
+
+# Learning Objectives
+
+1. Distinguish between scientific and statistical questions and articulate appropriate scientific questions for experimental variables.
+2. Explain the differences between frequentist and Bayesian inference.
+3. State the Central Limit Theorem and explain its importance for inferential statistics.
+4. Describe the difference between a population (data) distribution and a sampling distribution.
+5. Describe the distributions of the sample mean $\overline{X}$ and variance $^2$ and their parameters.
+6. Define a point estimate of a parameter and describe how we evaluate how good an estimator is, including:
+    a. what it means for an estimator to be biased,
+    b. what it means for an estimator to be consistent, and
+    c. what the Mean Squared Error of an estimator quantifies.
+7. Define a confidence interval appropriately, and the relationship between a confidence level (e.g., 95%, 99%) and probability.
+8. Describe the steps by which a confidence interval is determined for the mean $\mu$ and variance $\sigma^2$.
+9. Explain when a confidence interval for the population mean $\mu$ is based on a $z$ versus a $t$ statistic.
+9. Calculate confidence intervals at all levels for the population mean $\mu$, proportion and population variance $\sigma^2$ using sample data.
+10. Identify and compute standard errors in confidence interval calculations.
+11. Understand how sample size, variability, and confidence level affect the width of the confidence interval.
+12. Distinguish between wide and narrow confidence intervals and what they indicate about precision.
+13. Understand the assumptions required to construct valid confidence intervals (e.g., normality, random sampling).
+14. Interpret and communicate the results of confidence intervals in real-world contexts.
+15. Differentiate between statistical significance and practical significance using confidence intervals.
+
+# Upload GSS Data 
+
+```{r}
+# My data are in comma separated value (csv) format, with the first line (header) naming the variables:
+data <- read.csv("GSS_1980.csv",header=TRUE)
+data$ID <- NULL
+```
+
+# 1. Your turn! (Thinking ahead)
+
+Reading: [Binomial Test](https://en.wikipedia.org/wiki/Binomial_test)
+
+Suppose you give a multiple-choice exam with 20 questions, each question has 5 alternatives.  You grade on a straight scale (90,80,70...) so a failing grade is anything less than 60% (any score less than 12/20).  A student comes to you after the exam and says ``I only got 9 right, so I failed, but I studied really hard for this test!"  Do you believe them?
+
+Was the student guessing randomly or did they actually know at least some of the material?  To answer this question, think about the following adjacent questions:
+
+1. If $X$ is the number of questions a student gets right, what distribution might $X$ follow and what are its parameters?
+2. Given your answer to Question 1., how many questions might we expect they would get right by purely guessing?  (Remember, there are 5 alternatives for each question.) 
+3. For what value of $X$ would you be willing to state that they were *not* just guessing and that they did in fact know some of the material?  
+4. Let's say that the value you chose in Question 3 was $x_0$.  If you conclude they are not just guessing for that value, what will you conclude for values of $X > x_0$?
+5. What is the probability that $X \ge x_0$?
+6. Your answer to Question 5 is a *conditional* probability.  What is the "given" condition for that probability?
+
+Use R or a table to compute the requested probabilities.  (Your answer to Question 5 is the *p-value*.)
+
+>
+> Insert your narrative responses here
+>
+
+```{r}
+# Insert your code here
+```
+
+# Types of Questions
+
+Readings: 
+
+1. [Research questions](https://research-rebels.com/blogs/how-to-write-thesis/understanding-different-research-question-types-a-closer-look)
+2. [Statistical Questions in Research](https://www.quanthub.com/unraveling-the-significance-of-statistical-questions-in-research-corporate/#Guidelines_for_Defining_Your_Question)
+
+There is a difference between a scientific or research question and a statistical question.  A scientific question is a question about the world and how it works.  A statistical question is a question about the data.  
+
+Remember the "Boomer Effect" we saw with the GSS data?  We found that while the marginal probability of endorsing the sentiment that young people should listen to older people and take their advice was 0.386, the probability increased to 0.545 when we knew that the respondent was 50 years old or greater.
+
+Here are examples of a scientific question versus a statistical question:
+
+1. Scientific: Do older people have more difficulty appreciating perspectives that don't align with their long-held opinions and attitudes?
+2. Statistical: Is the increase from 0.386 to 0.545 statistically significant, or is it something that might arise due to chance (sampling variability)?
+
+The answers to statistical questions have no inherent value when taken out of context.  Their only purpose is to support the arguments we want to make about the answers to scientific questions.
+
+## 2. Your turn!
+
+Select two of your variables.  Write down a scientific question about each of them that interests you.  For each question, write down an appropriate statistical question that you could use to support your hypotheses about the scientific questions.
+
+>
+> Insert your answers here.
+>
+
+# Sampling Distribution of $\overline{X}$
+
+Reading: 
+
+1. Howell (Chapter 4)
+2. Lane [Sampling distributions](https://www.onlinestatbook.com/2/sampling_distributions/sampling_distributions.html)
+
+Consider a sample of independent and identically distributed (iid) random variables $X = \{X_1,X_2,\ldots,X_N\}$ drawn from an unknown distribution with mean $\mu=E(X)$ and variance $\sigma^2=Var(X)$.  Now consider the sample mean $\overline{X}$.  Remember that the sample mean is a random variable that measures the sample in the same way that the random variable $X_i$ measures an individual $i$.
+
+Now think about all those distributions I wanted you to become familiar with.  If the $X_i$s are random variables that come from some distribution then $\overline{X}$ is also a random variable that comes from a *sampling distribution*.  We distinguish between (population) distributions from which the $X_is$ are sampled and sampling distributions from which *sample statistics* are sampled. 
+
+I know that you've done this before, but here again is a chunk of R code that simulates the sampling distributions of $\overline{X}$ and $s^2$.
+
+```{r}
+N <- 10 # Sample size
+bignum <- 10000 # Number of samples
+
+means.x <- vars.x <- vector() # Initialize means and variance variables
+
+# Generate bignum samples and compute the mean and variance for each  
+for (i in 1:bignum) {  
+  x <- rexp(N) # Draw N values from an exponential distribution
+  means.x[i] <- mean(x)
+  vars.x[i] <- var(x)
+}
+
+# Plot the distributions
+par(mfrow=c(1,3)) # I want 3 plots in a row
+x <- seq(0,5,length=200) # Defines the plot points for the population density
+
+# Plot the density function of the population (distribution of X)
+plot(x,dexp(x),xlab="Values of X",ylab="Density",main="Population",type='l')
+
+# Draw the estimate of the density of the sample mean as a histogram
+hist(means.x,freq=FALSE,breaks=seq(-.5,ceiling(max(means.x))+.5,length=20),
+     main="",xlab="Values of Sample Mean",ylab="Estimated Density")
+
+# Draw the estimate of the density of the sample variance as a histogram
+hist(vars.x,freq=FALSE,breaks=seq(-.5,ceiling(max(vars.x))+.5,length=20),
+     main="",xlab="Values of Sample Variance",ylab="Estimated Density")
+```
+
+There are a few things to notice about these pictures.  First, the population density looks unusual.  This is the density of the exponential distribution.  The exponential distribution describes the time between rare events: when lightbulbs burn out, when Porches drive through a particular intersection, airline accidents, the emission of particles during radioactive decay, the firing of a neuron.  The mode of the distribution is 0 and the density decays (exponentially) as $x$ goes to infinity.  
+
+Second, the distributions of the means and variances look nothing like the exponential population from which the samples were drawn.  This is because the sampling distributions of sample statistics are not tied to the population distribution (except through that population's parameters).
+
+Finally, the distributions of the means and variances are positively skewed but maybe kind of look bell-shaped. If you increase the value of $N$ you can see this more clearly.  This is the effect of the Central Limit Theorem, which we will discuss below.  
+
+## The Mean and Variance of $\overline{X}$
+
+Reading: Lane et al. [Sampling Distribution of the Mean](https://www.onlinestatbook.com/2/sampling_distributions/samp_dist_mean.html)
+
+At the risk of repeating myself too often, it is very important that you think not about the single value of $\overline{X}$ that you obtain from the one sample that you have at hand, but about all possible $\overline{X}$s you might have obtained from all possible samples from the population with the same sample size $N$.  The sample mean $\overline{X}$ is a measurement for the group $X = \{X_1,X_2,\ldots,X_N\}$.  The variable $X_i$ is a measurement of the individual $i$.
+
+Starting simply, we can compute the expected value $E(\overline{X})$ and variance $Var(\overline{X})$ of the sample mean $\overline{X}$.  Do not confuse these values with the expected value $E(X)$ and variance $Var(X)$ of the variable $X$.  These values are already given to us: $E(X) = \mu$ and $Var(X) = \sigma^2$. It will turn out that $E(\overline{X})$ and $Var(\overline{X})$ are closely related to $\mu$ and $\sigma^2$. 
+
+### Mean of $\overline{X}$
+
+Using the linear property of the $E()$ operator and the assumption that the $X_i$s are iid from a distribution with mean $\mu$,
+
+\begin{eqnarray*}
+E(\overline{X}) & = & E \left( \frac{\sum_{i=1}^N X_i}{N} \right) \\
+& = & \frac{1}{N} \sum_{i=1}^N E(X_i) \\
+& = & \frac{1}{N} \sum_{i=1}^N \mu = \frac{N \mu}{N} = \mu.
+\end{eqnarray*}
+
+This demonstrates that whatever the distribution of the mean $\overline{X}$ is, its mean is the same as the mean of the population from which the $X_i$s were sampled.
+
+```{r}
+# The mean of the Exp(1) distribution is 1.
+mean(means.x)
+```
+
+### Variance of $\overline{X}$
+
+Using the rules of the $Var()$ operator,
+
+\begin{eqnarray*}
+Var(\overline{X}) & = & Var \left( \frac{\sum_{i=1}^N X_i}{N} \right) \\
+& = & \left( \frac{1}{N} \right)^2 \sum_{i=1}^N Var(X_i) \text{ (by independence)}\\
+& = & \left( \frac{1}{N} \right)^2 \sum_{i=1}^N \sigma^2 \\
+& = & \left( \frac{N \sigma^2}{N^2} \right) = \frac{\sigma^2}{N}.
+\end{eqnarray*}
+
+```{r}
+# The variance of the Exp(1) distribution is 1
+# These two computations should be approximately equal:
+1/N
+var(means.x)
+```
+
+The square root of the variance of the sampling distribution of the mean is called the standard error of the mean.  This vocabulary derives from the fact that the sample mean is supposed to be a *prediction* for the population mean $\mu$.  The sample mean varies from sample to sample, however, so it isn't perfect.  We quantify this degree of imperfection with its standard error $\sqrt{\sigma^2/N}$.  
+
+## Things to notice
+
+Go back to the chunk of code above and increase $N$ to something gigantic.  Observe what happens to the distribution of $\overline{X}$.  Now look at the expected value and variance of $\overline{X}$.
+
+The expected value $E(\overline{X})=\mu$ regardless of the sample size $N$.  This makes a certain intuitive sense.  The observations in a sample can't be too far from the population mean $\mu$ (remember Chebyshev's Inequality), so the mean of the sampling distribution of the mean $\overline{X}$ shouldn't be too far from $\mu$ either.
+
+The variance $Var(\overline{X})=\sigma^2/N$ depends on the sample size $N$.  Importantly, as $N \rightarrow \infty$ then $Var(\overline{X}) \rightarrow 0$.  This means that for large enough $N$ the sample mean $\overline{X}$ is a constant.  This also makes sense: if $N$ is infinity, then the sample size is the entire population and when we compute the "sample" mean of that sample it can only equal $\mu$.  The larger $N$ gets, the distribution of sample mean draws tighter and tighter around $\mu$ until $\overline{X}=\mu$ for all samples.
+
+This characteristic of the sampling distribution of $\overline{X}$ is called the Law of Large Numbers, which simply states that as $N$ grows the value of $\overline{X}$ will approach $\mu$: the larger the sample, the more accurate $\overline{X}$ is as an estimate of $\mu$.  The fact that $E(\overline{X}) = \mu$ also means that $\overline{X}$ is an *unbiased* estimate of $\mu$: *on average* $\overline{X}$ will equal $\mu$.  
+
+## 3. Your turn!
+
+Simulate a lot of samples (bignum=10000) of varying sizes (say, N=c(5,10,30,100)) from a non-normal distribution (e.g., Poisson, $\chi^2$, or [something else](https://cran.r-project.org/web/views/Distributions.html#continuous-univariate-distributions)).  Compute the mean of each set of samples, then compute the mean and variance of the means for each value of $N$.  The replicate function might be helpful:
+
+```{r}
+# Or you can use the for loop as above, or the "matrix trick" I was using 
+# earlier:
+# means.x <- replicate(bignum,mean(rXXXX(N,...)))
+# where XXXX is the root name of the distribution quad and ... is where you 
+# should put in the distribution parameters.
+```
+
+Plot the values of the mean and variance of the means as a function of $N$.
+
+```{r}
+# Insert your code here
+```
+
+# The Central Limit Theorem
+
+Reading: Howell Chapter 7 (Sections 1, 2)
+
+Videos: 
+
+1. Lane et al. [Central Limit Theorem Demo](https://www.onlinestatbook.com/2/sampling_distributions/clt_demo.html)
+2. Khan Academy [Central Limit Theorem](https://www.khanacademy.org/math/statistics-probability/sampling-distributions-library/sample-means/v/central-limit-theorem)
+
+I introduced the concepts behind the Central Limit Theorem (CLT) when I introduced the normal distribution in the last notebook.  The normal distribution is ubiquitous in variables derived from natural systems because these variables are the result of many small perturbations.  Whenever you are adding up the values of a lot of variables you should suspect that the result will follow a normal distribution.  
+
+More formally, the CLT states that as the size of a sample $N$ goes to infinity, the distribution of the sum of those variables approaches a normal distribution.  Because $\overline{X} = \sum_{i=1}^N X_i / N$ is a sum multiplied by a constant ($1/N$), the sampling distribution of $\overline{X}$ will tend to a normal distribution as $N$ grows.  
+
+The CLT holds regardless of the shape of the population from which $X$ was sampled (see the exponential distribution in the code chunk above).  *This is the foundation of inferential tests involving the sample mean $\overline{X}$.*  We know the characteristics of the sampling distribution of $\overline{X}$ even if we know nothing about the population from which $X$ was drawn. 
+
+# An Incomplete List of Sampling Distributions
+
+| Statistic         | Known Population Parameter(s)    | Test Statistic                                                                            | Null$^*$ Mean   | Variance                   | Sampling Distribution |
+|:---:|:---:|:---:|:---:|:---:|:---:|
+| Mean              | $\mu$ and $\sigma^2$       | $\overline{X}$                                                                              | $\mu_0$         | $\sigma^2/N$               | $\mathcal{N}(\mu_0,\sigma^2/N)$ |
+| Standardized Mean | $\mu$,$\sigma^2$                      | $(\overline{X}-\mu)/\sqrt{\sigma^2/N}$                                                           | 0               | 1              | $\mathcal{N}(0,1)$ |
+| Standardized Mean | $\mu$                      | $(\overline{X}-\mu)/\sqrt{s^2/N}$                                                           | 0               | $(N-1)/(N-3)$              | $t(N-1)$ |
+| Variance          | $\sigma^2$                 | $(N-1)s^2/\sigma^2$                                                                         | $N-1$           | $2(N-1)$                   | $\chi^2(N-1)$ |
+| Mean Difference   | $\mu_1 - \mu_2$,$\sigma^2$ | $\overline{X_1} - \overline{X_2}$                                                           | $\mu_1 - \mu_2$ | $\sigma^2 (1/N_1 + 1/N_2)$ | $\mathcal{N}(\mu_1 - \mu_2,\sigma^2 (1/N_1 + 1/N_2))$ |
+| Mean Difference   | $\mu_1 - \mu_2$          | $\dfrac{(\overline{X_1} - \overline{X_2}) - (\mu_1 - \mu_2)}{\sqrt{s_P^2 (1/N_1 + 1/N_2)}}$ | 0               | $s_P^2 (1/N_1 + 1/N_2)$    | $t(N_1 + N_2-2)$ |
+| Mean Difference   | $\mu_1 - \mu_2$            | $\dfrac{\overline{D} - (\mu_1 - \mu_2)}{\sqrt{s_D^2/N}}$                                    | 0               | $(N-1)/(N-3)$              | $t(N-1)$ |
+| Variance Ratio    | $\sigma_1^2$, $\sigma_2^2$ | $s_1^2/s_2^2$ (sample sizes $N_1+1$ and $N_2+1$)                                                | $N_2/(N_2-2)$   | Messy           | $F(N_1,N_2)$ |
+
+$^*$The mean of the test statistic is given relative to the usual null hypothesis (e.g., $\mu_1 = \mu_2$, $\sigma^2_1 = \sigma^2_2$, etc.), when appropriate.
+
+# Aside: Frequentist vs. Bayesian Inference
+
+Reading: Howell Chapter 5 (Section 5.7)
+
+The inferential tests with which you are most familiar are based on a *frequentist* perspective.  This perspective bases all procedures on what might happen if we repeated an experiment a very large number (e.g. "bignum") of times: that is, on the sampling distribution of a statistic.  Decisions about the value of an unknown parameter (like $\mu$) are based on the probability of the statistic given hypothesized (null) values of that parameter.  The unknown parameter is a constant that we are trying to discover.
+
+By contrast, the Bayesian approach starts with a prior belief about a parameter (as represented by a prior distribution on that parameter), a model of the data (as represented by a distribution of the data given the parameter), and an updating of our belief about the parameter given the data we observe.  Bayes' Theorem (which you've probably heard about but we haven't yet discussed) is the rule that turns a prior distribution into a posterior distribution.  
+
+While the frequentist approach bases decisions on $Pr(S(X) ~|~ \theta)$, a probability associated with the statistic $S(X)$ conditioned on hypothesized values of the parameter(s) $\theta$, the Bayesian approach bases decisions on $Pr(\theta ~|~ X)$, a probability associated with the parameter(s) $\theta$ given the observed data $X$.
+
+When (even very smart) people try to explain what a $p$-value is (a frequentist concept based on $Pr(S(X) ~|~ \theta)$), they often make the mistake of referring to $Pr(\theta ~|~ X)$ instead.  Don't be one of those people!
+
+Try to remember that "named" tests (z-tests, t-tests, F-tests, etc.) base decisions on $Pr(S(X) ~|~ \theta)$.  The parameter(s) $\theta$ is assumed to be a constant with no variability.  
+
+# Data Models and Analysis Assumptions
+
+Video: [What is a statistical model?](https://www.youtube.com/watch?v=KOBaNFEyrLA) (This instructor has a heavy Australian accent, turn on closed captioning.  Also, this video covers some pretty advanced (regression) topics, but you might like it.)
+
+A data model is a statement about the process that generated the data.  Sometimes these models are very impoverished, stating only that (e.g.) $X \sim \mathcal{N}(\mu,\sigma^2)$.  Sometimes they are much more detailed, stating that (e.g.) response times measured in a choice experiment follow a distribution arising from an accumulation of evidence over time described by a Wiener or diffusion process.
+
+All parametric (named) statistical tests are based on a model of the data.  Z-tests assume that the mean $\overline{X}$ follows a normal distribution.  T-tests assume that the data $X$ follow a normal distribution.  Simple regression assumes that a predicted variable $Y$ is a linear function of a predictor variable $X$ ($Y_i = mX_i + b + \epsilon_i$), with the errors $\epsilon_i \sim \mathcal{N}(0,\sigma^2)$.  
+
+Try to always remember what model you are embracing when you perform a test.  Sometimes the model for a test is a very poor choice for your data.  Sometimes the choice is easy: the CLT guarantees that the sample mean is normally distributed, for example.
+
+The hypothesis tests that we will perform later require some assumptions.  In addition the data model, we will need to assume things like equal sample sizes and equality of variances.  In addition to choosing the wrong model for your data, these other assumptions may be unwarranted.  Get in the habit of checking your assumptions when you perform parametric analyses.  There are a suite of *nonparametric* procedures that allow you to relax these assumptions, and we will visit some of them later.
+
+# Estimating Distribution Parameters
+
+Reading: Lane et al. [Estimation](https://www.onlinestatbook.com/2/estimation/estimation.html)
+
+Given that every test is based on a specific model of the data, the analysis of the data is at least in part an exercise in estimating the parameters of the model.  There are two different approaches to estimation: point estimation and interval estimation.  
+
+1. Point estimation thinks about how to use sample data to arrive at the best numerical estimate of a population parameter, such as $\overline{X} = \hat{\mu}$ as an estimate of $\mu$.
+2. Interval estimation computes a range of values that includes an unknown parameter value some pre-specified proportion of time.
+
+Both point and interval estimation are rooted in the frequentist tradition.  
+
+## Point Estimators
+
+If you were told that a sample had a mean of $\overline{X}$, what would you guess the population mean $\mu$ was?  The value of $\overline{X}$ would be a very good choice. The sample mean $\overline{X}$ is called a point estimate of the population mean $\mu$.  We often write $\hat{\mu} = \overline{X}$; the "hat" over the parameter means "estimate."
+
+I spoke earlier about how $\overline{X}$, despite its weaknesses as a measure of central tendency, is used most frequently because of its convenient mathematical properties.  Some of those properties are related to its properties as an estimator of $\mu$.
+
+### Bias
+
+Video: Kahn Academy [Bias](https://www.khanacademy.org/math/ap-statistics/summarizing-quantitative-data-ap/measuring-spread-quantitative/v/sample-standard-deviation-and-bias)
+
+We showed above that $E(\overline{X}) = \mu$: on average, the sample mean equals the population mean.  This property is called unbiasedness, and it holds regardless of the shape of the population distribution.  You can increase the sample size in the following chunk of code to see that the mean of the sample mean quickly approaches the population mean.
+
+```{r}
+# Sample means from a very not-normal distribution
+# The Wald distribution (or inverse normal distribution) is the distribution describing the finishing times of a drift diffusion model with a single response threshold (called an "absorbing boundary").
+
+# The Wald distribution has two parameters: mu and lambda.  The mean of the distribution equals mu; the variance equals mu^3/lambda.
+mu <- 4
+lambda <- 2
+N <- 20
+means.wald <- replicate(10000,mean(rwald(N,mu,lambda)))
+
+# The mean of the sample means is very close to mu
+mean(means.wald)
+```
+
+### Consistency
+
+Readings: Navarro [Law of Large Numbers](https://learningstatisticswithr.com/book/estimation.html#lawlargenumbers)
+
+Video: Kahn Academy [Law of Large Numbers](https://www.khanacademy.org/math/statistics-probability/random-variables-stats-library/expected-value-lib/v/law-of-large-numbers)
+
+The *Law of Large Numbers* tells us that as $N \rightarrow \infty$, $\overline{X} \rightarrow \mu$.  This property is called consistency: when $N$ is large enough, the sample mean should equal the population mean.  We can see this in the variance of the sample mean $\sigma^2/N$.  As $N \rightarrow \infty$, the variance of $\overline{X}$ $\sigma_{\overline{X}}^2$ goes to zero, while $\overline{X} \rightarrow \mu$.
+
+```{r}
+# Increase N to something ridiculous
+N <- 100000
+# Sample from an exponential distribution with mu=5
+X <- rexp(N,1/5)
+mean(X)
+```
+
+### Minimum Variance
+
+Reading: [Mean squared error](https://en.wikipedia.org/wiki/Mean_squared_error)
+
+Remember what I said about the standard error of the mean $\overline{X}$?  It quantifies the extent to which the sample mean fails to predict the population mean $\mu$.  An estimator of a population parameter can be evaluated on its *mean squared error*, which is equal to its bias squared plus its variance.  Because the sample mean $\overline{X}$ is unbiased, its mean squared error (MSE) is simply equal to its variance $\sigma^2/N$.  The sample median $Md$ is also unbiased but has a variance that is a function of the distribution from which the sample was obtained.  We can simulate the MSEs of these two estimators of $\mu$ without performing any computations.
+
+```{r MSE}
+# This might run slowly because the median is 
+# difficult to compute
+bignum <- 10000 
+N <- 30 # sample size
+mu <- c(-50,-10,10,50,100,200) # population means
+
+mse.mean <- mse.median <- vector()
+# Compute the MSEs for different values of mu and plot the results
+for (i in 1:length(mu)) {
+   # Sample from a normal distribution with mean mu and variance 1
+   X.bar <- colMeans(matrix(rnorm(bignum*15,mu[i],1),ncol=bignum))
+   Md.samples <- matrix(rnorm(bignum*15,mu[i],1),ncol=bignum) # Computing the median is tricky, do it differently
+   Md <- apply(Md.samples,2,quantile,.5) 
+
+   # Compute the MSEs
+   mse.mean[i] <- mean((X.bar-mu[i])^2) # this is equal to bias^2 + variance
+   mse.median[i] <- mean((Md-mu[i])^2)
+}   
+
+# Plot the results
+plot(mu,mse.median,type='b',ylim=c(min(mse.mean,mse.median),max(mse.mean,mse.median)),
+     xlab="Values of mu",ylab="Mean Squared Error",col="orange4")
+lines(mu,mse.mean,col="purple4")
+points(mu,mse.mean,col="purple4")
+legend("left",c("Mean","Median"),col=c("purple4","orange4"),lty=1)
+```
+
+You can see that the estimator that minimizes the MSE is always the sample mean $\overline{X}$.  We can show that this is always the case when the samples come from normal distributions (and often when they come from other distributions).  We say that $\overline{X}$ is a *minimum variance unbiased estimator* (MVUE) of $\mu$, and there is no other estimator that will have a smaller MSE.  This is another reason why, despite its other weaknesses, the sample mean $\overline{X}$ dominates statistical inference about the population mean $\mu$.
+
+### 4. Challenge
+
+Change the normal distribution in the code above to the exponential distribution.  If you want the exponential distribution to have the means given in the mu vector then change the rnorm() function to rexp(...,1/mu) (but remove the negative mus from the mu vector).  Is the sample mean $\overline{X}$ still better than the sample median $Md$?
+
+## 5. Your turn!
+
+We talked in an earlier notebook about the difference between the two ways of computing the sample variance $S^2$ and $s^2$.
+
+Which of these two statistics is the "better" estimate of population variance $\sigma^2$?  Answer this question by sampling $N$ observations from a normal distribution with known variance a large number of times -- you choose $N$, but it should be pretty large (like 100 or so).  Compute $S^2$ and $s^2$; which is unbiased? Which is consistent?  Compute the MSE for each.  Look at the code above: the MSE for a bunch of simulated samples will be the mean of the squared differences between the estimates and the actual parameter value (the population variance $\sigma^2$).
+
+In the R DescTools package there are two variance commands.  Var(x) is the same as var(x) and computes $s^2$.  VarN(x) computes $S^2$, which you can also obtain by a transformation of $s^2$:
+\[
+\dfrac{(N-1)s^2}{N} = S^2.
+\]
+
+```{r}
+# Insert your code here
+```
+
+## Confidence Intervals
+
+Readings:
+
+1. Navarro [Estimating a confidence interval](https://learningstatisticswithr.com/book/estimation.html#ci)
+2. Howell Chapter 3 (Section 4)
+3. Lane et al. [Confidence Intervals](https://www.onlinestatbook.com/2/estimation/confidence_ov.html)
+
+Video: Khan Academy [Confidence Intervals](https://www.khanacademy.org/math/statistics-probability/confidence-intervals-one-sample/introduction-to-confidence-intervals/v/confidence-intervals-and-margin-of-error)
+
+Many journals require that your statistical analyses (like $t$-tests) also be accompanied by confidence intervals.  A confidence interval is defined as an interval computed from the data that will include the "true" value of a population parameter some pre-specified proportion of the time.  These intervals are derived from sampling distributions of the statistics that best inform us about particular population parameters (e.g., $\overline{X}$ for $\mu$, $s^2$ for $\sigma^2$). 
+
+Many (most?) such intervals are concerned with the population mean $\mu$ and the interval is centered on the sample mean $\overline{X}$.  
+
+### What a Confidence Interval Is
+
+Execute the following code chunks to illustrate the idea behind the confidence interval around the sample mean $\overline{X}$.  If you aren't clear about what a $z$-score is, now would be a good time to [review](https://www.simplypsychology.org/z-score.html).  Remember that the (population) $z$-score for the sample mean is
+\[
+z_{\overline{X}} = \dfrac{\overline{X} - \mu}{\sigma/\sqrt{N}},
+\]
+and $z_{\overline{X}}$ follows a $\mathcal{N}(0,1)$ if $N$ is large enough that $\overline{X} \sim \mathcal{N}(\mu,\sigma^2/N)$. 
+
+Let's start by illustrating sampling values of $\overline{X}$ from its sampling distribution.
+
+```{r}
+z<-seq(-4,4,length=300) # for plotting
+# Sample some means from the standard normal distribution. 
+set.seed(396484) # keep this line so we all get the same results
+x <- rnorm(15,0,1) 
+```
+
+Now we'll plot these sampled means under the density of the sample mean, which (again) is normal with mean $\mu$ and variance $\sigma^2/N$.  Because RStudio is stupid about plotting, I have to repeat a bunch of code at each step and I'm sorry about that.
+
+We know that the central 95\% of the area under the normal curve is contained within 1.96 standard deviations from the mean.  We can see this using qnorm():
+
+```{r}
+qnorm(c(0.025,0.975),0,1)
+```
+
+Add these limits to the plot of the sampling distribution.  Notice that if we are working with a normal distribution of some variable $X$ with mean $\mu$ and variance $\sigma^2$, the limits $\mu - 1.96 \sigma$ and $\mu + 1.96 \sigma$ will enclose 95\% of the area under the curve.  This is coming from the definition of the $z$-score.  If
+\[
+1.96 = \dfrac{X_U - \mu}{\sigma}
+\]
+then the upper limit
+\[
+X_U = \mu + 1.96 \sigma.
+\]
+
+If we are talking about the random variable $\overline{X}$, which we know has mean $\mu$ and variance $\sigma^2/N$, then 
+\[
+\overline{X}_U = \mu + 1.96 \dfrac{\sigma}{\sqrt{N}}.
+\]
+
+```{r}
+y <- seq(.1,5.25,length=15) # stretch out the y-axis
+# Initialize an empty plot:
+plot(0,axes=FALSE,ann=FALSE,type="n",xlim=c(-5,5),ylim=c(0,7.5))
+
+# Add the limits that enclose 95% of the area of the sampling distribution
+text(x=c(-1.96,0,1.96),y=8,c(expression(paste(mu,"-1.96",sigma[bar(X)])),
+                               expression(mu),
+                               expression(paste(mu,"+1.96",sigma[bar(X)]))),xpd=NA)
+abline(v=c(-1.96,1.96),lty=2)
+abline(v=0,lty=3)
+
+# To see what the following functions add to the figure, run them one at a time.
+lines(z,4*dnorm(z)+5.6) # extend lines outside the plotting region
+abline(h=5.6) # y=0, x-axis line
+text(0,-.5,expression(paste("Values of ",bar(X),sep='')),xpd=NA)
+```
+
+Now add the sampled values of $\overline{X}$ to the figure.
+```{r}
+# ~~~~~~~~ Repeated code
+y <- seq(.1,5.25,length=15) # stretch out the y-axis
+# Initialize an empty plot:
+plot(0,axes=FALSE,ann=FALSE,type="n",xlim=c(-5,5),ylim=c(0,7.5))
+
+# Add the limits that enclose 95% of the area of the sampling distribution
+text(x=c(-1.96,0,1.96),y=8,c(expression(paste(mu,"-1.96",sigma[bar(X)])),
+                               expression(mu),
+                               expression(paste(mu,"+1.96",sigma[bar(X)]))),xpd=NA)
+abline(v=c(-1.96,1.96),lty=2)
+abline(v=0,lty=3)
+
+# To see what the following functions add to the figure, run them one at a time.
+lines(z,4*dnorm(z)+5.6) # extend lines outside the plotting region
+abline(h=5.6) # y=0, x-axis line
+text(0,-.5,expression(paste("Values of ",bar(X),sep='')),xpd=NA)
+# ~~~~~~~~~~~~
+
+# Sample some X-bars
+points(x,y,pch="|",col="purple4")
+
+# The width of the interval that encloses 95% of the distribution
+arrows(x0=-1.96,y0=y[15],x1=1.96,y1=y[15],code=3,length=.05,
+       angle=90,col="seagreen",lwd=2)
+```
+
+You can see that the interval extending from $\pm 1.96$ standard errors has $\mu$ right in the middle; it "covers" $\mu$.  But we can shift that interval over so that $\overline{X}$ is in the middle instead.
+
+```{r}
+# ~~~~~~~~ Repeated code
+y <- seq(.1,5.25,length=15) # stretch out the y-axis
+# Initialize an empty plot:
+plot(0,axes=FALSE,ann=FALSE,type="n",xlim=c(-5,5),ylim=c(0,7.5))
+
+# Add the limits that enclose 95% of the area of the sampling distribution
+text(x=c(-1.96,0,1.96),y=8,c(expression(paste(mu,"-1.96",sigma[bar(X)])),
+                               expression(mu),
+                               expression(paste(mu,"+1.96",sigma[bar(X)]))),xpd=NA)
+abline(v=c(-1.96,1.96),lty=2)
+abline(v=0,lty=3)
+
+# To see what the following functions add to the figure, run them one at a time.
+lines(z,4*dnorm(z)+5.6) # extend lines outside the plotting region
+abline(h=5.6) # y=0, x-axis line
+text(0,-.5,expression(paste("Values of ",bar(X),sep='')),xpd=NA)
+
+# Sample some X-bars
+points(x,y,pch="|",col="purple4")
+# ~~~~~~~~~~~~~~~~~~~~
+
+# Shift the interval to be centered around the first X-bar
+arrows(x0=-1.96+x[15],y0=y[15],x1=1.96+x[15],y1=y[15],code=3,length=.05,angle=90,col="seagreen",lwd=2)
+```
+
+This first sample of $\overline{X}$ falls within 1.96 standard errors from $\mu$, and so when the interval is shifted so that $\overline{X}$ is in the middle instead of $\mu$, the interval contains/covers $\mu$.  Draw all the intervals for all the sampled means.
+
+```{r}
+# ~~~~~~~~ Repeated code
+y <- seq(.1,5.25,length=15) # stretch out the y-axis
+# Initialize an empty plot:
+plot(0,axes=FALSE,ann=FALSE,type="n",xlim=c(-5,5),ylim=c(0,7.5))
+
+# Add the limits that enclose 95% of the area of the sampling distribution
+text(x=c(-1.96,0,1.96),y=8,c(expression(paste(mu,"-1.96",sigma[bar(X)])),
+                               expression(mu),
+                               expression(paste(mu,"+1.96",sigma[bar(X)]))),xpd=NA)
+abline(v=c(-1.96,1.96),lty=2)
+abline(v=0,lty=3)
+
+# To see what the following functions add to the figure, run them one at a time.
+lines(z,4*dnorm(z)+5.6) # extend lines outside the plotting region
+abline(h=5.6) # y=0, x-axis line
+text(0,-.5,expression(paste("Values of ",bar(X),sep='')),xpd=NA)
+
+# Sample some X-bars
+points(x,y,pch="|",col="purple4")
+# ~~~~~~~~~~~~~~~~~
+
+# Shift all the intervals
+arrows(x0=-1.96+x,y0=y,x1=1.96+x,y1=y,code=3,length=.05,angle=90,col="seagreen",lwd=2)
+```
+
+Now it is evident that every time an $\overline{X}$ falls within $\pm 1.96$ standard errors from $\mu$, when the interval is shifted to be centered around $\overline{X}$ that shifted interval will contain $\mu$.  Only when an $\overline{X}$ is sampled outside that interval (which will happen 5\% of the time) will the shifted interval *not* contain $\mu$.
+
+Therefore we see that a confidence interval is constructed so that 95\% of such intervals (computed by repeated sampling from the same population) will contain the value of $\mu$.
+
+### Deriving the Confidence Interval Around $\overline{X}$ When $\sigma^2$ is Known
+
+We can use algebra and the $z$-score to derive the formula for a $1 - \alpha$ confidence interval around $\overline{X}$.  Beginning with $\alpha=0.05$, we start with the fact that
+\[
+Pr(-1.96 \le Z \le 1.96) = 0.95
+\]
+if $Z \sim \mathcal{N}(0,1)$.  Substitute the $z$-score of the sample mean for $Z$ to get 
+\[
+Pr(-1.96 \le \dfrac{\overline{X} - \mu}{\sigma/\sqrt{N}} \le 1.96) = 0.95.
+\]
+Now rearrange the probability statement so that $\mu$ is alone between the upper and lower limits:
+\begin{eqnarray*}
+Pr(-1.96 \le \dfrac{\overline{X} - \mu}{\sigma/\sqrt{N}} \le 1.96)\\
+\text{(multiply through by } \sigma/\sqrt{N}) & = & Pr(-1.96 \sigma/\sqrt{N}\le \overline{X} - \mu \le 1.96 \sigma/\sqrt{N}) \\
+\text{(subtract }\overline{X}\text{ from all terms)} & = & Pr(-1.96 \sigma/\sqrt{N} - \overline{X} \le  - \mu \le 1.96 \sigma/\sqrt{N} - \overline{X}) \\
+\text{(multiply through by } -1) & = & Pr(1.96 \sigma/\sqrt{N} + \overline{X} \ge \mu \ge -1.96 \sigma/\sqrt{N} + \overline{X}) \\
+\text{(reorder terms smallest to largest)} & = & Pr(\overline{X} - 1.96 \sigma/\sqrt{N}  \le \mu \le \overline{X}  + 1.96 \sigma/\sqrt{N}) = 0.95.
+\end{eqnarray*}
+
+This leads directly to the rule that the 95\% confidence interval around the mean $\overline{X}$ is given by $\overline{X} \pm 1.96 \dfrac{\sigma}{\sqrt{N}}$.
+
+### What is Random in a Confidence Interval?
+
+Suppose you observe a mean $\overline{X} = 15$ for a sample size of $N=16$, and that you know $\sigma = 10$.  Then the 95\% confidence interval around $\overline{X}$ is
+\[
+15 \pm 1.96 \dfrac{10}{\sqrt{16}} = [10.10,19.90].
+\]
+
+Does it make sense to say that $Pr(10.10 \le \mu \le 19.90) = 0.95$?
+
+It does not.  The population mean $\mu$ is not random, nor are the values 10.10 and 19.90.  The only thing that is random is the sample mean $\overline{X}$, and it is the value of this statistic under repeated sampling to which probability attaches.  
+
+The proper way to interpret the confidence interval is to say that 95\% of the intervals that we compute in this way will contain or cover the population mean.  It is this uncertainty that is portrayed in the figures you constructed above.
+
+### When $\sigma^2$ Is Not Known
+
+Reading: Howell Chapter 7 (pp. 192 - 195)
+
+Videos: 
+
+1. Kahn Academy [Estimating a population mean](https://www.khanacademy.org/math/statistics-probability/confidence-intervals-one-sample/estimating-population-mean/v/introduction-to-t-statistics)
+2. Kahn Academy [T-statistic confidence interval](https://www.khanacademy.org/math/statistics-probability/confidence-intervals-one-sample/old-confidence-interval-videos/v/t-statistic-confidence-interval)
+
+When the population variance $\sigma^2$ is unknown we will estimate it with the sample variance $s^2$.  While what we just did worked from the standard normal distribution (so $\pm 1.96$ for a 95% confidence interval), we will now need to shift to the $t$-distribution with the appropriate degrees of freedom.
+
+We can run through the same algebra as before that resulted in the expression $\overline{X} \pm z_{\alpha/2} \dfrac{\sigma}{N}$, to arrive at the equivalent expression using the $t$ distribution $\overline{X} \pm t_{\alpha/2}(df) \dfrac{s}{N}$, where $df=$ the degrees of freedom for $s^2$. The only caveat is that we have to assume that the data $X$ come from a normal $(\mu,\sigma^2)$ population.  The following code illustrates both the computation of confidence intervals using a $t$-distribution and the importance of the normality assumption.
+
+First we'll simulate a dataset drawn from a non-normal distribution (exponential) with mean $\mu=5$ and variance $\sigma^2 = 25$.
+
+```{r}
+# Confidence intervals with t
+# Draw 10000 samples of size 30 from an exponential distribution 
+# with mean 5 and compute the sample means
+bignum <- 10000 # Number of samples
+N <- 30         # Sample size
+lambda <- 5     # Population mean
+conf <- .95     # Confidence level
+
+# Sample from an Exp(lambda) distribution
+x <- matrix(rexp(30*10000,1/lambda),ncol=30)
+```
+
+For each of the (bignum) simulated samples compute the means and standard errors.
+
+```{r}
+# Compute the means and standard errors for each sample
+means <- rowMeans(x)
+ses <- apply(x,1,sd)/sqrt(N) # Sample sd divided by sqrt(N)
+```
+
+Take a peek at the sampling distribution of the means.  It should have a mean close to 5 and a standard deviation (error) close to $5/\sqrt{30} = 0.9129$.
+
+```{r}
+# Plot the sampling distribution of the means, stick the mean of the means on it
+# and add the limits that enclose conf% of the area under the curve.
+cat("Mean = ",mean(means)," and standard error = ",sd(means))
+hist(means,freq=FALSE,breaks=25,main="",xlab="Sample Means")
+abline(v=mean(means))
+limits <- quantile(means,c((1-conf)/2,1-(1-conf)/2))
+abline(v=limits,lty=3)
+```
+
+For the rest of this exercise we're going to first assume that the population variance is known (because it is, it's $\sigma^2 = 25$), and then that it isn't.
+
+Compute the confidence limits obtained for each sample with $\sigma^2 = 25$.
+```{r}
+# Variance known: sigma^2 = 25
+z.limits <- qnorm(c((1-conf)/2,1-(1-conf)/2))
+z.lower <- means + z.limits[1]*lambda/sqrt(N)
+z.upper <- means + z.limits[2]*lambda/sqrt(N)
+```
+
+Now compute the confidence limits assuming that $\sigma^2$ is unknown, which requires that we shift from the standard normal (0,1) distribution to compute the limits to the t(29) distribution.
+
+```{r}
+# Variance unknown: use s^2
+t.limits <- qt(c((1-conf)/2,1-(1-conf)/2),N-1)
+t.lower <- means + t.limits[1]*ses
+t.upper <- means + t.limits[2]*ses
+```
+
+For the z and the t confidence intervals, 95% of the intervals should contain the population mean $\mu=5$.
+
+```{r}
+# Compute the probabilities that the z and t intervals 
+# contain lambda
+conf.z <- mean(lambda >= z.lower & lambda <= z.upper)
+conf.t <- mean(lambda >= t.lower & lambda <= t.upper)
+rbind(c("Confidence","Sigma known","Sigma unknown"),
+      c(0.95,round(conf.z,2),round(conf.t,2)))
+```
+
+You can see that the proportion of $t$-intervals containing $\mu$ is considerably smaller than it should be, while the proportion of $z$ intervals is exactly right.  This indicates that the $t$ intervals are too narrow, and that the level of confidence that we have for them is smaller than we believe; we are overconfident.  In statistics, overconfidence is a bad thing; you always want to be underconfident.  You don't want to be making claims with a high(er) probability of being wrong than you think.
+
+Why did this happen with the $t$ intervals?  Remember that an important assumption of the $t$ distribution is that the data $X$ be normally distributed.  Let's redo this exercise with normally distributed data, drawing samples from a normal(5,1) distribution.
+
+```{r}
+# The t-distribution requires that X be normally distributed, so redo
+# Sample from an N(lambda,1) distribution
+x <- matrix(rnorm(30*10000,lambda,1),ncol=30)
+
+# Compute the means and standard errors for each sample
+means <- rowMeans(x)
+ses <- apply(x,1,sd)/sqrt(N) # Sample sd divided by sqrt(N)
+```
+
+We'll now compute the $z$ intervals using the known population variance $\sigma^2=1$.
+
+```{r}
+# Variance known: sigma^2 = 1
+z.limits <- qnorm(c((1-conf)/2,1-(1-conf)/2))
+z.lower <- means + z.limits[1]*1/sqrt(N)
+z.upper <- means + z.limits[2]*1/sqrt(N)
+```
+
+When we assume we don't know $\sigma^2$ we need to estimate it with the sample variance.  We prepared for this above by computing the standard errors (ses).
+
+```{r}
+# Variance unknown: use s^2
+t.limits <- qt(c((1-conf)/2,1-(1-conf)/2),N-1)
+t.lower <- means + t.limits[1]*ses
+t.upper <- means + t.limits[2]*ses
+```
+
+Now compute the coverage probabilities for the $z$ and $t$ intervals.
+
+```{r}
+# Compute the probabilities that the z and t intervals 
+# contain lambda (mu)
+conf.z <- mean(lambda >= z.lower & lambda <= z.upper)
+conf.t <- mean(lambda >= t.lower & lambda <= t.upper)
+
+rbind(c("Confidence","Sigma known","Sigma unknown"),
+      c(0.95,round(conf.z,2),round(conf.t,2)))
+```
+
+Now the $t$ intervals have exactly the same coverage probability as the $z$ intervals.  To increase the confidence level of the $t$ intervals to match that of the $z$ intervals the $t$ intervals must be wider, which you can see by looking at the z.limits and t.limits variables.
+
+```{r}
+cat("Width of z-interval is ",z.limits[2]*2,"\n",
+  "Width of t-interval is ",t.limits[2]*2,"\n")
+```
+
+### 6. Your turn!
+
+Go back and to the beginning of this demo and change the value of $N$, the sample size.  What happens to the width of the intervals when $N$ decreases or increases?
+
+>
+> Insert your responses here
+>
+
+### 7. Your turn!
+
+Compute the 80\%, 90\%, 95\% and 99\% confidence intervals around the means of two of the variables in your dataset.  This will work best if the variables are continuous, but if they are discrete they should have a sample space with at least 5 values.  Notice the tradeoff between the precision of the interval and the level of confidence. 
+
+```{r}
+# Insert your code here
+```
+
+# Confidence Interval Around the Sample Proportion
+
+Reading:
+[Confidence Intervals for a Population Proportion](https://online.stat.psu.edu/stat100/lesson/9/9.1)
+
+Video: Kahn Academy [Estimating a population proportion](https://www.khanacademy.org/math/statistics-probability/confidence-intervals-one-sample)
+
+Suppose we have data $X = \{X_1, X_2, \ldots, X_N\}$ where $X_i$ is a categorical random variable that takes on the value 0 or 1.  So $X_i$ is drawn from a Bernoulli population with parameter $\pi$, where $Pr(X_i = 1) = \pi$.  The population mean of the Bernoulli distribution is $\pi$ and its variance is $\sigma^2 = \pi(1-\pi)$.  
+
+Proportion data give us a situation in which the population variance is always known.  The sample proportion is a mean $p = \sum_{i=1}^N X_i/N$; we count the number of 1s in $X$ and divide by $N$.  The sampling distribution of $p$ is therefore normally distributed (by the CLT) with mean $\pi$ and variance $\pi(1-\pi)/N$.  
+
+Because $\sigma^2$ is known in this case, we can use $z$ limits instead of $t$ limits to compute the confidence intervals around the sample proportion $p$.
+
+The response to the "younger generations should be taught to listen to their elders" question in the GSS dataset is a Bernoulli random variable and so we can compute a confidence interval around the sample proportion for this variable.  The value 1 is an endorsement of this sentiment and 2 rejects this sentiment.  The proportion of interest is how many people in the sample endorse the sentiment.
+
+```{r}
+# Compute the observed sample proportion
+p <- mean(data$YOUNGEN==1)
+```
+
+We can now choose a confidence level and compute the confidence interval around the value p= `r p`.
+
+```{r}
+# Confidence level
+conf <- 0.99
+
+# Compute the z limits for the desired level of confidence
+z.limits <- qnorm(c((1-conf)/2,1-(1-conf)/2),0,1)
+
+# Compute the standard error
+se = sqrt(p*(1-p)/length(data$YOUNGEN))
+
+# Compute the confidence limits
+limits <- p+z.limits*se
+limits
+```
+
+If we were writing this result up for publication we would say something like, "The sample proportion was `r p` (99% confidence interval [`r round(limits[1],2)`,`r round(limits[2],2)`])."
+
+# Confidence interval around the sample variance
+
+Reading: 
+
+1. Howell Chapter 7 (pp.183-184)
+2. [Sampling distribution of sample variance](https://online.stat.psu.edu/stat414/lesson/26/26.3)
+
+
+For any situation where a sample statistic or an "invertible" function of a sample statistic has a known distribution, we can derive a confidence interval for that statistic.  (If the function is not invertible we can use numerical methods but we can't write down a formula.)
+
+An interesting (and potentially useful) confidence interval is one for the population variance, centered on the sample variance.  As for the $t$ distribution, however, we need to assume that data are normally distributed.
+
+The fact about the sample variance $s^2$ that we're going to exploit is the fact that the variable
+\[
+\dfrac{(N-1) s^2}{\sigma^2}
+\]
+follows a $\chi^2$ distribution with $N-1$ degrees of freedom. 
+
+(Aside: We can also use the fact that $s^2$ follows a *gamma* distribution with *shape* parameter $(N-1)/2$ and *scale* parameter $2 \sigma^2/(N-1)$, but we'll only need that to draw the picture below.)   
+
+For a desired confidence level $1-\alpha$, the limits for $\sigma^2$ will be determined by the $\chi^2_{\alpha/2}(N-1)$ lower limit and $\chi^2_{1-\alpha/2}(N-1)$ upper limits.  Let's set up the parameters for a simulation mirroring what we did above for the mean $\mu$.
+
+```{r}
+bignum <- 10000
+N <- 10
+mu <- 100
+sigma <- 15 # standard deviation
+conf <- .95 # Desired confidence level
+```
+
+Now simulate the variances for repeated samples of size $N$ from a normal($\mu,\sigma^2$) distribution.
+
+```{r}
+# Compute bignum variances
+vars <- replicate(bignum,var(rnorm(N,mu,sigma)))
+```
+
+For $N-1$ degrees of freedom and the indicated confidence level, compute the lower and upper $\chi^2$ bounds.
+
+```{r}
+# "Critical" chi-squared values
+chi.l <- qchisq((1-conf)/2,N-1)
+chi.u <- qchisq(1-(1-conf)/2,N-1)
+```
+
+Now what do we do with these? Let's start with the $\chi^2$ limits and work toward the expression we need for the confidence interval.  We know that if a variable $Y \sim \chi^2(N-1)$, then
+\[
+Pr(\chi^2_{\alpha/2}(N-1) \le Y \le \chi^2_{1 - \alpha/2}(N-1)) = 1 - \alpha
+\]
+for confidence level $1-\alpha$.  To arrive at an expression that isolates $\sigma^2$ between two limits that we can compute, replace $Y$ with the $\chi^2$-distributed statistic:
+\[
+Pr(\chi^2_{\alpha/2} \le \dfrac{(N-1)s^2}{\sigma^2} \le \chi^2_{1 - \alpha/2}(N-1)) = 1 - \alpha.
+\]
+
+Now some algebra:
+\begin{eqnarray*}
+Pr(\chi^2_{\alpha/2}(N-1) \le \dfrac{(N-1)s^2}{\sigma^2} \le \chi^2_{1 - \alpha/2}(N-1)) \\
+\text{(divide through by } (N-1)s^2) & = & Pr\left(\dfrac{\chi^2_{\alpha/2}(N-1)}{(N-1)s^2} \le \dfrac{1}{\sigma^2} \le \dfrac{\chi^2_{1 - \alpha/2}(N-1)}{(N-1)s^2}\right) \\
+ \text{(take the inverse of all terms)}& = & Pr\left(\dfrac{(N-1)s^2}{\chi^2_{\alpha/2}(N-1)} \ge \sigma^2 \ge \dfrac{(N-1)s^2}{\chi^2_{1 - \alpha/2}(N-1)}\right) \\
+\text{(reorder terms from smallest to largest)} & = & Pr\left(\dfrac{(N-1)s^2}{\chi^2_{1 - \alpha/2}(N-1)} \le \sigma^2 \le \dfrac{(N-1)s^2}{\chi^2_{\alpha/2}(N-1)}\right) = 1 - \alpha.
+ \end{eqnarray*}
+
+The expression for a confidence interval around $\sigma^2$ is therefore 
+\[
+\left[\dfrac{(N-1)s^2}{\chi^2_{1 - \alpha/2}(N-1)},\dfrac{(N-1)s^2}{\chi^2_{\alpha/2}(N-1)}\right].
+\]
+
+Let's use this expression to compute the confidence intervals around $\sigma^2$ around each sample.
+
+```{r}
+# Lower and upper confidence limits
+lower <- (N-1)*vars/chi.u
+upper <- (N-1)*vars/chi.l
+```
+
+We can compute the coverage probability of these intervals, because we know the variance of the population from which the data were sampled.  
+
+```{r}
+coverage <- mean(lower <= sigma^2 & upper >= sigma^2)
+cat("Specified confidence level = ",conf," and the actual coverage probability = ",coverage)
+```
+
+In the remaining chunk of code I show that, unlike the confidence intervals around the mean, the confidence intervals around the variance differ in width from sample to sample.  This is because the interval does not add to the $s^2$ statistic, but $s^2$ multiplies the constants that determine the interval width.  This means that the larger $s^2$ is, the wider the confidence interval will be.
+
+To draw these plots I will switch to the sampling distribution of $s^2$ rather than the sampling distribution of $(N-1)s^2/\sigma^2$.  If you have questions about this please come and ask, but it can be confusing so I will not explain myself here.
+
+```{r}
+# Plot some of the confidence intervals
+var.values <- seq(0,ceiling(max(vars)),length=200) # for plotting the x-axis
+
+# Determine the size of the plotting area
+par(oma=c(3,3,3,3)) # all sides have 3 lines of space
+par(mar=c(5,4,4,2) + 0.1)
+
+# Start an empty plot
+plot(0,axes=FALSE,ann=FALSE,type="n",xlim=c(0,max(vars)),ylim=c(0,.0143))
+
+# Convert the chi-squared limits to gamma limits (confusing part)
+lines(var.values,.01+dgamma(var.values,shape=(N-1)/2,scale=2*sigma^2/(N-1)))
+abline(v=c(chi.l,chi.u)*sigma^2/(N-1),lty=2)
+
+# Add the true population variance
+abline(v=sigma^2,lty=3)
+abline(h=0.01)
+
+# Label the confidence limits
+text(x=c(chi.l,N-1,chi.u)*sigma^2/(N-1),y=.01477,xpd=NA,pos=3,
+     c(expression(frac(sigma^2 * chi[.025]^2*"(N-1)",N-1)),
+       expression(sigma^2),expression(frac(sigma^2 * chi[.975]^2*"(N-1)",N-1))))
+text(sigma^2,-.001,expression(paste("Values of ",s^2,sep='')),xpd=NA)
+
+# Add some of the observed variances to the plot, make sure at least 1 is 
+# outside of the confidence interval
+left <- which(sigma^2 < lower)[1]
+right <- which(sigma^2 > upper)[1]
+keep <- c(1:5,left,6:10,right,11:14) # plot these variances 
+x <- vars[keep] 
+y<- seq(.001,.009,length=16)
+points(x,y,pch="|",col="purple4")
+arrows(x0=lower[keep],y0=y,x1=upper[keep],y1=y,
+       length=.1,angle=90,code=3,col="darkorange1")
+```
+
+You can see in this figure that the larger $s^2$ is, the wider the confidence interval becomes. Despite the very wide intervals and their different widths, the only time the interval does not contain $\sigma^2$ is when the sample variance $s^2$ falls outside the 95% limits of the distribution.
+
+## 8. Your turn!
+
+Compute a 90% (not 95%!) confidence interval around the sample variance of one of the variables in your dataset.  Use the expression
+\[
+\left[\dfrac{(N-1)s^2}{\chi^2_{1 - \alpha/2}(N-1)},\dfrac{(N-1)s^2}{\chi^2_{\alpha/2}(N-1)}\right].
+\]
+
+```{r}
+# Insert your code here
+```
+
+# 9. Challenge
+
+Consider a sample $X = \{X_1, \ldots,X_N\}$ drawn from a normal($\mu,\sigma^2$) (or approximately normal) population.  For large enough $N$ (greater than 30), the sample *median* is approximately normally distributed with mean $\mu$ and variance $\sigma^2 \dfrac{\pi}{2N}$. Remember that $\pi = 3.14$, approximately. R knows what $\pi$ is:
+
+```{r}
+pi
+```
+
+Derive the expression for a $1-\alpha$ confidence interval for the population median. Compute a confidence interval (where $\alpha$ is of your own choosing) around the median of one of the variables in your dataset.  
+
+> 
+> Insert your calculations here
+>
+
+```{r}
+# Insert your code here
+```
+
+# 10. Your turn!
+
+Answer the following questions.
+
+1. How is statistical *inference* different from statistical *description*?
+2. Why are confidence intervals an important part of statistical inference?
+3. Think about what you've done in this notebook.
+    a. What was the most important thing you learned?
+    b. What was the hardest concept to understand?
+    c. What surprised you the most?
+4. How will you use confidence intervals in your own research?
+
+> 
+> Insert your responses here
+>
+
+
+
+
+

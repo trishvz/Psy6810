@@ -1,0 +1,836 @@
+---
+title: "Module 2 - Tests of Means"
+author: "TVZ"
+output:
+  word_document:
+    toc: true
+    toc_depth: '3'
+  pdf_document:
+    toc: true
+    toc_depth: 3
+  html_document:
+    df_print: paged
+    toc: true
+    toc_depth: 3
+editor_options:
+  markdown:
+    wrap: 80
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r results='hide'}
+# Upload the libraries used in this document
+library("ggplot2")
+library("tinytex")
+library("extraDistr")
+library("sysid")
+library("DescTools")
+library('effectsize')
+library('PairedData')
+```
+
+# Learning Objectives
+
+At the end of this section you should be able to:
+
+1. Explain the philosophy of null hypothesis testing.
+2. Identify the steps of hypothesis testing.
+3. Define the terms: null hypothesis, alternative hypothesis, level of significance, test statistic, $p$-value, and statistical significance.
+4. Distinguish between a one-tailed test and a two-tailed test, and explain how the research or scientific question determines the form of the alternative hypothesis.
+5. Translate a research/scientific question into a statistical question and formulate an appropriate set of null and alternative hypotheses to test that statistical question.
+6. Define Type I error and Type II error and identify the type of error that researchers control.
+7. Determine when $z-$ and $t$-tests should be used, and identify the kind of $t$-test appropriate for single samples, independent samples, and dependent samples. 
+8. Relate a $p$-value to the probability of a Type I error (they are not the same).
+9. List the assumptions required for a $t$-test to be accurate.
+9. Calculate the test statistic for a one-sample $z$-test and its $p$-value.
+10. Calculate the test statistic for a one-sample $t$-test and its $p$-value.
+11. Describe the Behrens-Fisher problem and the Satterthwaite correction and the relation between the two.
+12. Calculate a pooled variance estimate for the population variance shared by two distributions.
+13. Calculate the test statistic for an independent samples $t$-test under the assumption of equal variance and its $p$-value.
+14. Explain the difference between a $t$-test when variances are assumed to be equal vs. when they are not.
+15. Calculate the test statistic for a Welch's $t$-test and its $p$-value.
+16. Explain the benefits and drawbacks of a dependent sample design.
+17. Calculate the test statistic for a dependent samples $t$-test and its $p$-value.
+18. Summarize the results of a test of a null hypothesis in APA format.
+
+# Upload GSS Data 
+
+```{r}
+# My data are in comma separated value (csv) format, with the first line (header) naming the variables:
+data <- read.csv("GSS_1980.csv",header=TRUE)
+data$ID <- NULL
+```
+
+# Philosophy of Null Hypothesis Testing
+
+Readings:
+
+1. Lane et al. [Logic of Hypothesis Testing](https://onlinestatbook.com/2/logic_of_hypothesis_testing/intro.html)
+2. Howell Chapter 4 (Sections 4.3-4.6)
+3. Navarro [Hypothesis testing](https://learningstatisticswithr.com/book/hypothesistesting.html#hypotheses)
+
+Videos: Khan Academy Unit 12 [Significance tests](https://www.khanacademy.org/math/statistics-probability/significance-tests-one-sample)
+
+Recall everything you did in the Confidence Interval notebook and the central importance of a sampling distribution.  While that notebook was concerned with estimation of parameters, null hypothesis testing is concerned with making statements about parameters.  Null hypothesis testing is the "evil twin" of interval estimation, a fact that I will elaborate on in a few lines.
+
+The philosopher [Karl Popper](https://plato.stanford.edu/entries/popper/) is primarily known for his argument that perhaps the most important characteristic of a scientific theory is that it must be falsifiable.  A theory that is not falsifiable, that holds no matter what data we encounter, has no explanatory value and is no better than no theory at all.  A single falsifying observation, however, is sufficient to reject a theory (or, at least, one or more of that theory's foundational statements).  
+
+The desire to falsify statements about population parameters is the heart of null hypothesis testing.  In null hypothesis testing we make arguments about what the population parameter is by rejecting statements about what it is.  So, for example, you might want to claim that grass is green.  To do this, you would set up a *null hypothesis* that you know or suspect is false: grass is blue, for example.  Then you take your wavelength meter out onto the lawn and measure light wavelengths that are inconsistent with the color blue.  "Grass is not blue!" you state confidently.  But you can't then state confidently, "Therefore grass is green!" (No, you really can't, not within the null hypothesis testing framework.)
+
+Abelson's entertaining and insightful book, [*Statistics as Principled Argument*](https://books.google.com/books?id=TgmbosIA7N0C&pg=PA1&source=gbs_toc_r&cad=2#v=onepage&q&f=false) characterizes null hypothesis testing as "ritualized [devil's advocacy](https://en.wikipedia.org/wiki/Devil%27s_advocate)" (Chapter 1, pp. 8-11).  It requires that we embrace a position that we do not hold (grass is blue) and then look for falsifying data (wavelength measurements) that allow us to reject the position.  Therefore, we don't try to prove the position we actually hold but instead try to reject the position that we don't.   
+
+Whether your *alternative hypothesis* that the grass is green is true or not is not something that this falsification procedure can address; the procedure can only allow us to claim that the null hypothesis is false, and in statistics we make that claim with the knowledge that there is some probability that we are wrong.  We will never be 100% certain that we've drawn the correct conclusion.  Furthermore, because the null hypothesis is designed to reflect what we believe to be false, we are prohibited from concluding that it is true when our data do not unambiguously contradict it.  There are too many reasons why our results might have prevented us from rejecting it.
+
+In null hypothesis testing the evidence against the null hypothesis is formulated as a probability.  This is where the sampling distribution comes in.  Knowing the sampling distribution of a statistic allows us to compute the *conditional* probabilities associated with values of "test" statistics that we compute from our data.  The *condition*  is that the null hypothesis is true.  The probability that we compute is the probability that we reject the null hypothesis by mistake.  If the probability of rejecting the null hypothesis by mistake is "small enough" then we reject it.  It is up to us to decide what small enough is.
+
+In this notebook we will focus almost exclusively on hypotheses about the population mean $\mu$.  Is it bigger than some null value? Smaller? Or merely different?  
+
+Now is the time to make sure you understand the following ideas:
+
+1. The Central Limit Theorem guarantees that the sampling distribution of the sample mean $\overline{X}$ follows a normal distribution with mean $\mu$ and variance $\sigma^2/N$, where $N$ is the size of the sample and $\mu$ and $\sigma^2$ are the mean and variance of the population from which the data $X$ were sampled.
+2. If we are forced to estimate $\sigma^2$ with the sample variance $s^2$, then the $t$ statistic defined as $\dfrac{\overline{X}-\mu}{\sqrt{s^2/N}}$ follows a $t$ distribution with $N-1$ degrees of freedom, as long as $X$ comes from a normal distribution or something close.
+
+# Errors
+
+Readings:
+
+1. Navarro [Two types of errors](https://learningstatisticswithr.com/book/hypothesistesting.html#errortypes)
+2. Lane et al. [Type I and Type II Errors](https://onlinestatbook.com/2/logic_of_hypothesis_testing/errors.html)
+3. Howell Chapter 4 (Section 4.7)
+
+Video: Khan Academy [Introduction to Type I and Type II Errors](https://www.khanacademy.org/math/statistics-probability/significance-tests-one-sample/error-probabilities-and-power/v/introduction-to-type-i-and-type-ii-errors)
+
+The hypotheses about a population mean $\mu$ that null hypothesis testing tests are formulated as the null $H_0$ and alternative $H_1$.  So for example, a *two-tailed test* is expressed as
+\begin{eqnarray*}
+H_0: && \mu = \mu_0 \\
+H_1: && \mu \ne \mu_0,
+\end{eqnarray*}
+where $\mu_0$ is some hypothesized value for the population mean (i.e., an explicitly stated number, like 100 or 0).
+
+Two things to recognize right now are that
+
+1. *Only* unknown population parameters appear in the statements of the hypotheses.  It makes no sense to put sample statistics in these statements because we can compute them and look at their values.  We don't need to formulate hypotheses about them because we have them already.  Similarly, if we know what a population parameter is (as in the case of standardized testing), then we don't perform hypothesis testing on those parameters.
+2. The equal sign "=" only appears in the null hypothesis $H_0$.  The null value of $\mu_0$ is the uninteresting case and stating that $\mu = \mu_0$ is a way of saying that we are trying to show that, by rejecting $H_0$, our data demonstrate that something interesting happened.  A drug performs better than placebo; a new teaching method results in higher test scores than the (standardized) average.  The equal sign never appears in the alternative $H_1$.
+
+The null hypothesis testing ritual allows for only two states of the world: the null hypothesis is either true or false.  We have only two possible choices after examining our data: we either reject $H_0$ or fail to reject it (we almost never "accept" it).  This means there are two kinds of mistakes we can make.  We can reject $H_0$ when it's true, or fail to reject it when it's false.  These are called Type I and Type II errors, respectively (Table 1).
+
+| Decision | $H_0$ True | $H_0$ False |
+|:---:|:---:|:---:|
+Fail to reject | ---  | Type II |
+Reject | Type I | --- | 
+*Table 1. Kinds of errors we might make in null hypothesis testing.*
+
+Our goal is to set up the testing procedure so that the probability of a Type I error is as small as possible while still permitting us to reject $H_0$.  (Remember what happens to the width of a confidence interval for 100% confidence?  If we want the probability of making a Type I error to be zero then we will never reject $H_0$.)  Simultaneously we want the probability of a Type II error to be as small as possible.  
+
+Because the sampling distributions of our test statistics are completely determined by the null hypothesis it is easy to control the probability of a Type I error by setting $\alpha$ to something small (Table 2).  But the true value of the parameter is unknown to us; all we know, if we reject $H_0$, is what it isn't.  So control of the Type II error rate $\beta$ is much more difficult.  Type I error probabilities are controlled by only rejecting $H_0$ when we observe extreme test statistics that fall in the tails of their sampling distributions.  Type II error probabilities depend on a sampling distribution with unknown parameters and so can't be computed or controlled.  
+
+| Decision | $H_0$ True | $H_0$ False |
+|:---:|:---:|:---:|
+Fail to reject | $1-\alpha$  | $\beta$ |
+Reject | $\alpha$ | $1-\beta$ | 
+*Table 2. Probability of errors and correct decisions in null hypothesis testing.*
+
+# Steps
+
+Readings
+
+1. Lane et al. [Steps in Hypothesis Testing](https://onlinestatbook.com/2/logic_of_hypothesis_testing/steps.html)
+
+Null hypothesis testing is one tool among a large number of possible statistical tools.  Remember that statistical procedures give us answers to statistical questions that are only interesting to the extent that they support (or fail to support) the answers to scientific questions that tell us about the world.  Null hypothesis testing is a ritual that helps us feel like we are being objective, scientific and precise, but no one is immune to subjective biases that color their conclusions.  Because there is no single "correct" procedure to perform in statistics, we can find ourselves, consciously or unconsciously, "fudging" (p-hacking) in little ways that help results turn out the way we want them to.  
+
+So follow these steps but don't worship them.  
+
+1. State your alpha level.
+2. Formulate your null and alternative hypotheses, using your research question to arrive at the form of the alternative.
+3. Check your data for the truth of the necessary assumptions for the test you want to perform.  Are your groups independent?  Are your data from a normal distribution? Etc.
+3. Compute the appropriate test statistic (e.g., $z$, $t$ or something else), including all the additional computations that may be necessary (e.g., pooling variance, computing correlations, error variances, degrees of freedom, etc.).
+4. Compute the $p$-value and compare it to your alpha level.  Do *not* change your alpha level after the fact.  Do *not* add to your data after you have run the test.  
+
+# One vs. Two-tailed Tests
+
+Readings:
+
+1. Howell Chapter 4 (Section 4.8)
+2. Navarro [Making decisions](https://learningstatisticswithr.com/book/hypothesistesting.html#decisionmaking)
+3. Lane et al. [One- and Two-Tailed Tests](https://onlinestatbook.com/2/logic_of_hypothesis_testing/tails.html)
+
+Video: Khan Academy [One-tailed and two-tailed tests](https://www.khanacademy.org/math/statistics-probability/significance-tests-one-sample/more-significance-testing-videos/v/one-tailed-and-two-tailed-tests)
+
+The format of a null hypothesis is always a variation of $H_0: \theta = \theta_0$, where $\theta$ is the population parameter of interest and $\theta_0$ is the value that represents a failure of the experiment performed.  The purpose of an experiment is (usually) to demonstrate an effect of an experimental manipulation, with the goal of eventually proving causal relationships.  The null value of $\theta_0$ is whatever represents no effect.  
+
+The format of the alternative hypothesis is determined by your research question, or what you want to argue is true.  If you want to argue that meditation decreases stress, then the stress levels of the meditation group should be less than the stress levels of the control group.  If a drug lengthens the lifespans of cancer patients then patients who receive the drug should live longer than patients who receive a placebo.  
+
+Let the lifespans of the population of treated cancer patients be $X$ and those of untreated patients be $Y$.  If the drug is ineffective then the populations means of the two groups will be equal: $\mu_X = \mu_Y$.  If the drug is effective then $\mu_X > \mu_Y$.  If our goal is to argue that the drug is effective, then we would formulate the hypotheses as
+\begin{eqnarray*}
+H_0: && \mu_X = \mu_Y \text{ and } \\
+H_1: && \mu_X > \mu_Y.
+\end{eqnarray*}
+You might also write the null hypothesis as $H_0: \mu_X \le \mu_Y$ but that is not strictly necessary.  Just remember that the "=" sign must be in the null hypothesis, not the alternative.
+
+In some cases the scientific question may require that you evaluate the data for a difference from $\theta_0$ in either the positive or negative direction.  That is, do the data suggest that the truth is different from $\theta_0$:
+\begin{eqnarray*}
+H_0: && \mu_X = \mu_Y \text{ and } \\
+H_1: && \mu_X \ne \mu_Y.
+\end{eqnarray*}
+Drug interventions and other measures that could worsen a system after treatment (air pollution levels, manufacturing procedures, teaching strategies, etc.) may require the use of two-tailed tests so you can argue that the treatment didn't make things worse.  However, in many situations the use of a two-tailed test is a red flag for *exploratory* analysis.  A researcher doesn't know the system well enough to be able to predict the influence of a treatment.  While these initial analyses are important, they do not provide strong evidence for scientific theories or causal relationships.  
+
+Well-formulated, *confirmatory* analyses rarely use two-tailed tests.  
+
+## 1. Your turn!
+
+In the last notebook I asked you to write out scientific questions for several of the variables in your dataset.  For each of these, 
+
+1. Explain what the population is from which the samples were drawn.  For the cancer example above, the population might be all the individuals with a certain type of cancer who receive the drug.  A population for the GRE scores of everyone in Fall 2024 6810 might be everyone who took the GRE in 2023.
+2. Identify the population parameter that would be important for answering your scientific question.
+3. Formulate the null and alternative hypotheses for each scientific question.
+
+>
+> Insert your answers here
+>
+
+# Comparisons of Means
+
+Readings:
+
+1. Lane et al. [Tests of Means](https://onlinestatbook.com/2/tests_of_means/testing_means.html)
+2. Howell Chapter 7
+
+Videos: 
+
+1. Khan Academy [Z-statistics vs. T-statistics](https://www.khanacademy.org/math/statistics-probability/significance-tests-one-sample/more-significance-testing-videos/v/z-statistics-vs-t-statistics)
+2. Khan Academy [When to use z or t](https://www.khanacademy.org/math/statistics-probability/significance-tests-one-sample/tests-about-population-mean/v/when-to-use-z-or-t-statistics-in-significance-tests)
+
+All the tests we discuss in this notebook involve hypotheses about population means ($\mu$).  They will involve comparisons of single means with a constant or comparisons between two means.  The statistics we use to test these hypothesis involve the sample mean $\overline{X}$ when the population variance $\sigma^2$ is known and both the sample mean $\overline{X}$ and variance $s^2$ when $\sigma^2$ is unknown.  
+
+From the previous notebook, you should remember that for a single mean the sampling distribution of the mean $\overline{X}$ is $\mathcal{N}(\mu,\sigma^2/N)$, and if $\sigma^2$ is unknown the $t$-statistic $t = (\overline{X}-\mu_0)/(s/\sqrt{N})$ follows a $t$-distribution with mean 0 (if $H_0$ is true) and $N-1$ degrees of freedom.  
+
+The sampling distribution of $\overline{X}-\overline{Y}$ is $\mathcal{N} \left( \mu_X - \mu_Y , \sigma^2 \left(\dfrac{1}{N_X} + \dfrac{1}{N_Y} \right) \right)$ if $\sigma^2$ is known.  If $\sigma^2$ is unknown, then the test statistic $t = \dfrac{\overline{X}-\overline{Y}}{s_P \sqrt{\dfrac{1}{N_X} + \dfrac{1}{N_Y}}}$ follows a $t$-distribution with $N_X + N_Y - 2$ (or smaller, if the homoskedasticity assumption is violated) degrees of freedom.  
+
+These sampling distributions form the basis of almost all parametric tests of single or two means comparisons.
+
+Select your $\alpha$ level, usually $\alpha = 0.05$.  (Some people, including your instructor, believe that [this value should be smaller](https://www.nature.com/articles/s41562-017-0189-z).) Tests of means can be performed in one of three ways.
+
+1. Compute the conditional probability of obtaining a test statistic as extreme or more extreme that the one observed.  The condition is that the null hypothesis is true.  If this probability (the $p$-value) is small enough, less than $\alpha$, reject $H_0$ in favor of the alternative. 
+2. Given $\alpha$, determine the smallest value of the test statistic that would allow you to reject $H_0$.  This will be given by the $100\alpha\%-$quantile (for a 1-tailed test) or the $100 (\alpha/2)\%-$ and $100 (1 - \alpha/2)\%-$quantiles (for a two-tailed test) of the sampling distribution of the test statistic.  These are called the critical values of the test statistic and they determine the rejection regions of the sampling distribution.  If your test statistic falls in these regions, meaning that the magnitude of the statistic is greater than the magnitude of the critical value and therefore farther away from the hypothesized value of the mean $\mu$, reject $H_0$. 
+3. Determine the critical values of the test statistic as in 2 and then, if necessary, convert those values to the scale of the sample mean.  Call these values the critical values $\overline{X}_C$ of the mean.  Compare the observed sample mean $\overline{X}$ to these values.  If the magnitude of $\overline{X}$ is greater than $\overline{X}_C$, reject $H_0$.  
+
+While Options 2 and 3 seem very different from Option 1, it is in fact Option 1 that is driving the entire enterprise.  We want our probability $\alpha$ of making a Type I error to be as small as possible.  Comparing this probability to what the error probably would be if we used our data as the criterion for a decision to reject $H_0$ (the $p$-value) is the basis of the reject/fail to reject decision in all three cases.  Options 2 and 3 are mathematically equivalent to Option 1; they just require more steps.
+
+# Tests of a Single Mean
+
+To test null hypotheses of the form $H_0: \mu = \mu_0$, where $\mu_0$ is the number representing the null case (an experimental "failure"), you will perform either a $z$- or a $t$-test.  (Notice how the name of a test is determined by the sampling distribution of the statistic you will use to test the null hypothesis.)
+
+## $Z$-test
+
+Readings:
+
+1. Howell Chapter 7 (Section 7.2)
+2. Lane et al. [Testing a Single Mean](https://onlinestatbook.com/2/tests_of_means/single_mean.html)
+
+
+A $z$-test requires either that we know what the population variance $\sigma^2$ is or that our sample size $N$ is so large that it won't make a difference whether we use $\sigma^2$ or $s^2$.  You can figure out what $N$ would have to be by comparing the critical values of the $z$ statistic with those of the $t$ statistic.  Let $\alpha=0.05.$ for a 2-tailed test.
+
+```{r}
+alpha=0.05
+qnorm(1 - alpha/2) # critical z-statistic
+```
+
+The $z$-scores that cut off 0.025 area in each tail of the standard normal distribution are $\pm 1.96$.  Now look at the $t$-statistic:
+```{r}
+N <- 100
+qt(1-alpha/2,N-1)
+```
+
+As $N$ gets larger and larger, the critical $t$-statistic will get closer and closer to $z_{\alpha/2} = 1.96$.  Play around with $N$ in the code chunk above to determine the point at which it doesn't (or might not) matter which test you do.
+
+Speaking as a psychologist or social scientist, there aren't many realistic scenarios where you will know what $\sigma^2$ is.  "Known" variances arise from established research or historical data or for standardized tests.
+
+Assuming you don't have the resources to collect as much data as it will require to not make a difference which test to use, let's consider the situation where we know what $\sigma$ is: a test of proportions.
+
+### $Z$-test of proportions
+
+Reading: 
+
+1. Lane [Tests of Proportions](https://davidmlane.com/hyperstat/hypothesis_testing_se.html)
+2. Yao [Lower Tail Test of Proportions](https://www.r-tutor.com/elementary-statistics/hypothesis-testing/lower-tail-test-population-proportion)
+3. Yao [Upper Tail Test of Proportions](https://www.r-tutor.com/elementary-statistics/hypothesis-testing/upper-tail-test-population-proportion)
+4. Yao [Two-Tailed Test of Proportions](https://www.r-tutor.com/elementary-statistics/hypothesis-testing/two-tailed--test-population-proportion)
+
+Video: Khan Academy Unit 12 [Tests about a population proportion](https://www.khanacademy.org/math/statistics-probability/significance-tests-one-sample/tests-about-population-proportion/v/constructing-hypotheses-for-a-significance-test)
+
+Moving through this example, please note the redundant use of the letter $p$.  There is the sample proportion $p$ and the $p$-value.  These are not the same thing.
+
+In the GSS dataset, what proportion of people report that they are happy?
+
+```{r}
+happy <- data$HAPPY < 3
+mean(happy)
+```
+
+Returning to the question of whether money can buy happiness, consider the highest 10% of earners in the dataset.
+```{r}
+highest <- data$REALRINC >= quantile(data$REALRINC,.90)
+sum(highest)
+```
+
+The number of highest earners is $N=98$.  Let $\pi$ be the proportion of happy high earners (greater than \$56,000, more or less) in the 1980 US population.  If money buys happiness, we would expect that the proportion of happy people in this population to be higher than the overall mean of 88\%.  So,
+\begin{eqnarray*}
+H_0: && \pi = 0.88 \text{ and } \\
+H_1: && \pi > 0.88.
+\end{eqnarray*}
+
+Remember that a sample proportion $p$ is just a mean of a set of measurements that take on only the values 0 or 1.  If $H_0$ is true, then this mean has mean $\pi = 0.88$ (the population mean) and variance $\sigma^2 = (0.88)(1 - 0.88)/98 = 0.0011$.  We will test $H_0$ using each of the three options presented above.  Set $\alpha= 0.05$ and compute the sample proportion:
+
+```{r sigma2}
+alpha = 0.05
+sigma2 <- (0.88)*(1 - 0.88)/98
+p <- mean(happy[highest==TRUE])
+p
+```
+
+#### Compute the $p$-value
+
+Conditioned on the null hypothesis, the sample proportion $p$ follows a normal distribution with mean $\pi = 0.88$ and variance $\sigma^2 = 0.0011$.  The $p$-value is the probability of obtaining a sample proportion greater than $p=0.9490$ from this distribution.
+
+```{r}
+p.value <- 1 - pnorm(p,0.88,sqrt(sigma2))
+p.value
+```
+
+Because the $p$-value 0.0178 is less than $\alpha = 0.05$, reject $H_0$ and conclude that the proportion of happy people among the highest earners is greater than average.
+
+#### Compute the critical value
+
+The critical $z$-score that cuts off the upper 0.05 area under the standard normal curve is
+```{r}
+z.c <- qnorm(1 - alpha)
+z.c
+```
+
+The rejection region is therefore defined as all $z$ values greater than 1.645.  Convert the observed proportion to a $z$-score with respect to the null distribution ($\mu = 0.88$):
+```{r}
+z.p <- (p - 0.88)/sqrt(sigma2)
+z.p
+```
+
+You might be wondering why we didn't compute the $z$-score by dividing sigma2 by $N$ like we do for the standard error of the sample mean.  The answer to this question is that we did.  Look up at the code chunk where sigma2 is computed.  It is already divided by $N$; it's the variance of $p$ and the square root is the standard error of $p$.  You don't have to divide by $N$ again.
+
+Because the $z$-score of $p$ $z_p = 2.101$ is greater than the critical $z_C = 1.645$, the $z$-score of the sample proportion is in the rejection region and we reject $H_0$.
+
+#### Compute the critical proportion
+
+We computed above the critical $z$-score to be 1.645.  Remember that this $z$-score tells us how many standard errors from the null value a proportion must be before we can reject $H_0$.  Convert this $z$-score to the critical proportion:
+```{r}
+p.c <- 0.88 + z.c*sqrt(sigma2)
+p.c
+```
+
+The critical proportion $p_C = 0.93$ is less than the observed proportion $p = 0.95$, so the observed proportion $p$ falls in the rejection region and we will reject $H_0$.
+
+#### Some Things to Keep in Mind
+
+1. For small samples you should do a [correction for continuity](https://davidmlane.com/hyperstat/A101248.html), specifically [this](https://davidmlane.com/hyperstat/B72362.html).  Compute the $p$-value on the real upper or lower limit of the observed proportion rather than the observed proportion itself.  Subtract $1/2N$ from the observed proportion for upper-tailed tests and add $1/2N$ for lower-tailed tests.  The value $1/2N$ is half the smallest interval between consecutive proportions ($1/N,2/N,\ldots,N/N$).  For the test above the $p$-value would be
+```{r}
+p.new <- 1 - pnorm(p-1/(2*N),0.88,sqrt(sigma2))
+p.new
+```
+2. Because proportions are constrained to be between 0 and 1 you might consider a transformation of the proportions, especially if the value of $p$ or $\pi$ is close to 0 or 1.  The goal is to avoid ceiling or floor effects that could hide significant effects.  The transformation is arcsin-square root:
+
+```{r}
+t.p <- asin(sqrt(p))
+```
+
+This transformation is used for multiple proportions, not a single proportion as in this example.  The error term will be estimated by the standard deviation of the transformed values divided by N.  
+
+### 2. Your turn!
+
+Perform a test of proportions using 1 or 2 of the variables in your dataset.  Follow the steps above to determine a null proportion (based on your knowledge of the population, an uninteresting value like "chance," or by computing the mean of your sample if you intend to examine a subset like I did).  Then subset the data if necessary to construct a sample of a "special case" to be tested.  For example, above I used the entire sample to determine a null mean (mean(happy)) and then looked at the proportion of happy people in a subset of the data (mean(happy[highest==TRUE])).  Be sure to specify your null and alternative hypotheses and your alpha level.
+
+```{r}
+# Insert your code here
+```
+
+## $T$-test: $\sigma$ is Unknown
+
+Readings:
+
+1. Navarro [The one-sample t-test](https://learningstatisticswithr.com/book/ttest.html#onesamplettest)
+2. Howell Chapter 7 (Section 7.3)
+3. Khan Academy [Conditions for inference on a mean](https://www.khanacademy.org/math/statistics-probability/significance-tests-one-sample/tests-about-population-mean/a/reference-conditions-inference-one-mean)
+
+Video: Khan Academy [Example calculating t statistic](https://www.khanacademy.org/math/statistics-probability/significance-tests-one-sample/tests-about-population-mean/v/example-calculating-t-statistic-for-signficance-test)
+
+If $\sigma$ is unknown the mean must be transformed to a $t$-statistic by 
+\[
+t = \dfrac{\overline{X} - \mu_0}{s/\sqrt{N}}.
+\]
+
+For tests of single means, the $t$-statistic follows a $t$ distribution with $N-1$ degrees of freedom, so long as $X$ follows a normal distribution.
+
+There is a old joke based on the myth that the average number of children in each US family is 2.5. In 1980 [this number was actually 1.91](https://www.statista.com/statistics/1033027/fertility-rate-us-1800-2020/).  Is the number of children in the families of GSS respondents different from this value?  I have no theory about why it would be greater or less; if anything I would suspect that it would be less because it takes a lot of time to fill out the survey.  People with lots of children don't have time to sit around and fill out long surveys.
+
+Set $\alpha=0.05$ and formulate the null and alternative hypotheses as
+\begin{eqnarray*}
+H_0: && \mu = 1.91 \text{ and } \\
+H_1: && \mu \ne 1.91.
+\end{eqnarray*}
+
+(It's important to keep in mind the population that $\mu$ is the mean of.  In this case I'll assume it is the population of 1980 GSS respondents, not all of whom are in this dataset.  The population is sometimes a fuzzy concept: Are GSS respondents a sample from the US population?  Or are they a subset consisting of people who respond to surveys?  Is it the population of respondents and potential respondents in 1980 or over all time?  It's a good idea not to be too aspirational when you define your population.  You don't want to be accused of overgeneralizing your findings.)
+
+Pull out the number of siblings for each respondent.  We'll need to convert siblings to number of children by adding 1, the respondent, to complete the count.  
+```{r}
+kids <- data$SIBS + 1
+```
+
+Now do the $t$-test two ways: Once by hand and then using the t.test() function.
+```{r}
+# By hand
+mu <- 1.91 # From H0
+N <- length(kids) # Sample size
+X.bar <- mean(kids) # Observed mean
+se <- sd(kids)/sqrt(N) # Standard error of the mean
+t <- (X.bar - mu)/se # t-statistic
+```
+
+To compute the $p$-value, we need to add the probability in both tails: if $t$ is far enough from 0 to reject $H_0$ then $-t$ is too.  But if $t < 0$ then we want to compute the lower tail probability and double it.  If $t>0$ then we want to compute the upper tail probability and double that.  So use the absolute value and work from the upper tail.
+```{r}
+2*(1-pt(abs(t),N-1))
+```
+ 
+The $t$-statistic is very large (29.65) and so the $p$-value is 0.00 and we reject $H_0$.
+
+Now use the t.test() function to recreate these results.
+```{r}
+t.test(kids,mu=1.91)
+```
+
+You might be surprised at the size of the difference between the observed mean $\overline{X} = 5.03$ and the null mean $1.91$.  Later we will talk about effect sizes, and the size of this effect is $d = \left| \dfrac{\overline{X} - \mu_0}{s} \right| = 1.23$, which is very large (0.80 is considered large).  If you were writing this analysis up for publication you would need to explain why the observed mean is so much higher than the national average.  I can think of a number of reasons!
+
+### 3. Your turn!
+
+Pick a variable from your dataset and conduct a one-sample $t$-test.  Determine what the null hypothesis should be and justify the direction of the test.  Compute the $t$-statistic and its $p$-value by hand and compare your results with the output of the t.test() function.
+
+```{r}
+# Insert your code here
+```
+
+# Tests of Two Means
+
+Readings: 
+
+1. Howell Chapter 7 (Section 7.5)
+2. Navarro [The independent samples t-test](https://learningstatisticswithr.com/book/ttest.html#studentttest)
+
+Video: Khan Academy [Statistical significance of experiment](https://www.khanacademy.org/math/statistics-probability/significance-tests-confidence-intervals-two-samples/comparing-two-means/v/statistical-significance-experiment)
+
+In most experiments we have more than one sample of observations, each sample being taken from  a different population that is defined by the experimental conditions.  Often we refer to these conditions as the "control" and "treatment" conditions.  Our goal is to argue that the experimental treatment had an effect, such that the treatment group has a larger, smaller, or different mean from the control group.  We write the null and alternative hypotheses as
+\begin{eqnarray*}
+H_0: && \mu_X = \mu_Y \text{ and } \\
+H_1: && \mu_X \gtrless \mu_Y,
+\end{eqnarray*}
+where the $\gtrless$ notation means less than, greater than, or unequal to, and $\mu_X$ and $\mu_Y$ are the means of the two populations of interest.
+
+If $\mu_X = \mu_Y$, then it must be the case that $\mu_X - \mu_Y = 0$.  Because $\overline{X}$ is a good estimator of $\mu_X$ (and similarly for $Y$), it should be clear that the test of this null hypothesis will depend on the value of $\overline{X} - \overline{Y}$.  Is the difference between the two sample means large enough to conclude that the null hypothesis is not true?
+
+To set up the background for the test, we need to determine the sampling distribution of $\overline{X} - \overline{Y}$.  
+
+## Sampling Distribution of the Mean Difference $\overline{X} - \overline{Y}$
+
+Reading: Lane et al. [Sampling Distribution of Difference Between Means](https://onlinestatbook.com/2/sampling_distributions/samplingdist_diff_means.html)
+
+Video: Khan Academy [Difference of sample means distribution](https://www.khanacademy.org/math/statistics-probability/significance-tests-confidence-intervals-two-samples/comparing-two-means/v/difference-of-sample-means-distribution)
+
+In this section I will sketch out the sampling distribution of $\overline{X} - \overline{Y}$.  This involves describing not only the distributional family (i.e., normal) but also the mean and variance of that distribution.  Then we need to set some assumptions to derive the test statistic $t$.
+
+### The distribution of $\overline{X} - \overline{Y}$
+
+We know by the Central Limit Theorem that $\overline{X}$ follows a normal distribution with mean $\mu$ and variance $\sigma^2/N$, where $\mu$ and $\sigma^2$ are the mean and variance of the population from which the individual measurements were obtained.  
+
+This means that both $\overline{X}$ and $\overline{Y}$ are approximately normally distributed with means $\mu_X$ and $\mu_Y$, respectively, and variances $\sigma^2_X/N_1$ and $\sigma^2_Y/N_2$, respectively, where $N_X$ and $N_Y$ are the sample sizes for Samples $X$ and $Y$, respectively.
+
+When random variables from two normal distributions are subtracted, like $\overline{X} - \overline{Y}$, the result is another normal distribution with mean $\mu_X - \mu_Y$.  The difficult question to answer is what the variance of this distribution is: the square root of this variance is the standard error of the statistic $\overline{X} - \overline{Y}$.
+
+> The first assumption: the two groups consist of measurements that are independent from each other.
+
+If the two groups are independent, then the variance of $\overline{X} - \overline{Y}$ is
+\begin{eqnarray*}
+\sigma^2_{\overline{X} - \overline{Y}} = Var(\overline{X} - \overline{Y}) & = & Var(\overline{X}) + Var(\overline{Y}) \\
+ & = & \dfrac{\sigma^2_X}{N_X} + \dfrac{\sigma^2_Y}{N_Y}. \\
+\end{eqnarray*}
+
+Remember this as one of the rules of the variance operator that we talked about in class and in earlier notebooks.  
+
+### Homoskedasticity vs. Heteroskedasticity
+
+Reading: Navarro [A "pooled estimate" of the standard deviation](https://learningstatisticswithr.com/book/ttest.html#a-pooled-estimate-of-the-standard-deviation)
+
+Knowing that $\sigma^2_{\overline{X} - \overline{Y}} =  \dfrac{\sigma^2_X}{N_X} + \dfrac{\sigma^2_Y}{N_Y}$, the standard error of $\overline{X} - \overline{Y}$ is $\sqrt{\dfrac{\sigma^2_X}{N_X} + \dfrac{\sigma^2_Y}{N_Y}}$.  We might estimate the standard error by substituting $s^2_X$ and $s^2_Y$ into this expression to yield $\hat{\sigma}_{\overline{X} - \overline{Y}} =  \sqrt{\dfrac{s^2_X}{N_X} + \dfrac{s^2_Y}{N_Y}}$.  In fact, this is exactly what we will do if we suspect that $\sigma^2_X \ne \sigma^2_Y$.  However, it is beneficial (we have more power) if we can make the following assumption:
+
+> The second assumption: Homoskedasticity.  The two population variances are equal: $\sigma^2_X = \sigma^2_Y = \sigma^2$.
+
+If the two populations share a common variance $\sigma^2$, then the standard error of  of $\overline{X} - \overline{Y}$ is $\sigma \sqrt{\dfrac{1}{N_X} + \dfrac{1}{N_Y}}$, factoring out $\sigma^2$ and removing the square.  With this assumption we only need to estimate the single variance $\sigma^2$.  
+
+To do this, recognize that the variance of a variable is unaffected by adding or subtracting a constant.  The addition or subtraction of a constant moves the center of the distribution but leaves its variance unaffected.  
+```{r}
+# Generate a random sample
+X <- rbinom(100,10,.3)
+# Subtract a constant, the mean of the sample
+Y <- X - mean(X) # remember that the mean is just a number
+
+# Compute the variances of X and Y
+cat("The variance of X is ",var(X)," and the variance of Y is ",var(Y),".\n")
+```
+
+Our goal is to use the observations in both samples $X$ and $Y$ to estimate $\sigma^2$.  Although the two samples have different means, if the samples come from populations with equal variances, then even though the sample means might be different the variances $s^2_X$ and $s^2_Y$ should be approximately the same (within sampling error).  The trick we will use is to recenter the observations in both samples around zero, which we do by subtracting the means.  Then the deviation scores $X_i - \overline{X}$ and $Y_i - \overline{Y}$ should come from the same distribution with mean 0 and variance $\sigma^2$.  
+
+Pooling all the deviation scores from both samples gives us a sample of deviation scores $D = \{X_1 - \overline{X},\ldots,X_{N_X} - \overline{X},Y_1 - \overline{Y},\ldots,Y_{N_Y}-\overline{Y}\}$.  The variance of $D$ is 
+\[
+s^2_D = s^2_P = \dfrac{\sum_{i=1}^{N_X} (X_i - \overline{X})^2 + \sum_{i=1}^{N_Y}(Yi - \overline{Y})^2}{(N_X - 1) + (N_Y - 1)},
+\]
+where $s^2_P$ is the notation for the "pooled" variance estimate of $\sigma^2$.  Notice that this estimate is based on $N_X + N_Y$ deviance scores, but rather than computing the variance of the deviance scores by dividing by $N_X+N_Y-1$, what we usually do, we divide by $N_X+N_Y-2$.  This is because we lose two degrees of freedom, one each for $\overline{X}$ and $\overline{Y}$, rather than one for the single mean that we usually have when we compute a single sample variance.
+
+If this is difficult to follow, recognize that the two sums in the numerator of $s_P^2$ are the numerators of the sample variances $s^2_X$ and $s^2_Y$:
+\[
+s^2_X = \dfrac{\sum_{i=1}^{N_X} (X_i - \overline{X})^2}{N_X - 1} \text{ so } (N_X - 1) s^2_X = \sum_{i=1}^{N_X} (X_i - \overline{X})^2
+\]
+(and similarly for $Y$).  This means that
+\[
+s^2_P = \dfrac{(N_X - 1) s^2_X + (N_Y - 1) s^2_Y}{N_X + N_Y - 2},
+\]
+which shows that the pooled variance estimate $s^2_P$ is a weighted average of the two sample variances.  Each variance is weighted by its degrees of freedom: the more degrees of freedom (the larger the sample size), the greater the weight given to that sample variance.  It is a good check on your work to make sure that $s^2_P$ falls between the two sample variances $s^2_X$ and $s^2_Y$.  
+
+We can demonstrate the utility of the pooled variance estimate by simulating two samples from populations with unequal means but equal variances.
+```{r}
+# For replicability
+set.seed(847562)
+
+
+# Define sample sizes
+N.X <- 20
+N.Y <- 30
+
+# Generate two samples from normal distributions with equal variance
+X <- rnorm(N.X,50,20)
+Y <- rnorm(N.Y,100,20)
+
+# Compute sample variances
+s2x <- var(X)
+s2y <- var(Y)
+
+# Pool the sample variances
+s2p <- ((N.X-1)*s2x + (N.Y-1)*s2y)/(N.X + N.Y - 2)
+
+cat("The population variance is ",20^2,'.\n')
+cat("The sample variance of X is ",s2x,' and the sample variance of Y is ',s2y,'.\n')
+cat("The pooled variance is ",s2p,'.\n')
+```
+
+Notice that the estimates aren't going to be perfect.  The variance is more difficult to estimate and requires much larger samples to be accurate.  Play around with the sample sizes and run the chunk of code above a few times to see what happens to the estimate, also to see the variability in the estimate.
+
+The effectsize package has a function for pooling the variance so that you don't have to type quite so much stuff.
+```{r}
+# sd_pooled() computes the pooled standard deviation.  Square it for the pooled variance.
+sd_pooled(X,Y)^2
+```
+
+### The Independent Samples $t$-Test
+
+We now know what quantities we need to compute a $t$ statistic.  For two samples $X$ and $Y$, with a null hypothesis $H_0: \mu_X = \mu_Y$ or $H_0: \mu_X - \mu_Y = 0$, we compute the pooled variance $s^2_P$ and
+\[
+t = \dfrac{\overline{X}-\overline{Y}}{s_P \sqrt{\dfrac{1}{N_X} + \dfrac{1}{N_Y}}}
+\]
+follows a $t$ distribution with $N_X + N_Y - 2$ degrees of freedom.
+
+Here's a research question to explore with a $t$-test: fertility indicators in the United States have shown a steady decline since the [turn of the 19th century](https://www.statista.com/statistics/1033027/fertility-rate-us-1800-2020/), with a brief recovery during the "boomer" years from 1945-1960. In 1800, the average woman would have approximately 7 children over their lifespan.  In 2020 this number was 1.78. Ignoring the boomer bump, we might expect that older GSS respondents have more siblings than younger respondents.  The null and alternative hypotheses are
+\begin{eqnarray*}
+H_0: && \mu_{\text{young}} = \mu_{\text{older}} \text{ and } \\
+H_1: && \mu_{\text{young}} < \mu_{\text{older}}.
+\end{eqnarray*}
+We will test the null hypothesis using an $\alpha$-level of 0.05.
+
+First we'll do a (rough) median split of the GSS dataset based on respondent age and then look at the mean number of siblings in the younger and older groups.
+```{r}
+# Perform a median split and pull out the sibling variable
+young <- data$AGE <= median(data$AGE)
+siblings <- data$SIBS
+```
+
+If you compute the proportion of observations in each group you will see that it is not a perfect 50/50 split.  This is because the median is within an interval (age=36) that contains a larger number of observations.  It's not possible to do a perfect split with all the age=36 observations in either the young or old group.  But it's close enough so I'm happy.
+
+Now we'll compute the sample means and variances of the number of siblings for the younger and older respondents.
+```{r}
+# Sample sizes
+N.young <- sum(young)
+N.older <- sum(!young)
+
+# Sample means
+mean.young <- mean(siblings[young==TRUE])
+mean.older <- mean(siblings[young==FALSE])
+
+# Sample variances
+var.young <- var(siblings[young==TRUE])
+var.older <- var(siblings[young==FALSE])
+```
+
+Pooling the variance is easy in R.
+```{r}
+sp2 <- sd_pooled(siblings[young],siblings[!young])^2
+```
+
+You can contrast this value with the weighted mean of the sample variances to make sure you have the concepts down.
+
+Now compute $t$.
+```{r}
+t.sibs <- (mean.older - mean.young)/sqrt(sp2*(1/N.young + 1/N.older))
+```
+
+Because we expect (under the alternative hypothesis) that the mean number of siblings for older respondents will be greater than that for younger respondents, we will reject $H_0$ for large positive values of $t$.  The rejection region is therefore in the upper tail of the $t$ distribution.
+
+The distribution of the test statistic ($t$) has 871 degrees of freedom.
+```{r}
+df <- N.older + N.young - 2
+1-pt(t.sibs,df) # p-value
+```
+
+The $p$-value is (much) smaller than $\alpha=0.05$ and so we reject $H_0$ and conclude that the mean number of siblings for older respondents (4.35) is significantly greater than that of younger respondents (3.73).
+
+We can contrast these results with the results using the t.test command.
+```{r}
+t.test(siblings ~ young,alternative='greater',var.equal=TRUE)
+```
+
+#### 4. Your turn!
+
+Pick an appropriate variable and perform an independent samples $t$-test.  This will be easiest if you have a categorical variable (like young) that splits the variable into two groups.  If you don't have a categorical variable then create one in the same way that I created the young variable above (a median split) or the happy variable earlier (by collapsing categories together).  You may also already have natural groups in your dataset that you can contrast.  
+
+Formulate and describe an interesting hypothesis and express it as null and alternative hypotheses.  Select an $\alpha$-level and perform an independent samples $t$-test both by hand and by using the t.test() function.  Make sure that your samples are in fact independent; don't work with dependent samples by mistake.
+
+```{r}
+# Insert your code here
+```
+
+### The Behrens-Fisher Problem
+
+Readings:
+
+1. Howell Chapter 7 (Section 7.6)
+2. Navarro [Welch test](https://learningstatisticswithr.com/book/ttest.html#welchttest)
+
+Suppose now that you have reason to believe that $\sigma^2_X \ne \sigma^2_Y$.  This is a violation of the homoskedasticity assumption and is called the *Behrens-Fisher problem*.  We can't factor a common $\sigma^2$ out of the variance of the mean difference but we can still use the expression $\dfrac{s^2_X}{N_X} + \dfrac{s^2_Y}{N_Y}$ to estimate it.  The problem is that we no longer know what the degrees of freedom are for the $t$-statistic that uses $\sqrt{\dfrac{s^2_X}{N_X} + \dfrac{s^2_Y}{N_Y}}$ as the standard error.
+
+The strategy here is to go ahead and compute the $t$ statistic as 
+\[
+t = \dfrac{\overline{X} - \overline{Y}}{\sqrt{\dfrac{s^2_X}{N_X} + \dfrac{s^2_Y}{N_Y}}}
+\]
+and then penalize ourselves by reducing the degrees of freedom to compute the $p$-value.  The reduction in degrees of freedom is called the *Satterthwaite correction*, and is computed as
+\[
+  df' =
+  \dfrac{\left(\dfrac{s^2_1}{N_1} + \dfrac{s^2_2}{N_2}\right)^2}
+        {\dfrac{\left(\dfrac{s^2_1}{N_1}\right)^2}{N_1-1} +
+          \dfrac{\left(\dfrac{s^2_2}{N_2}\right)^2}{N_2-1}}.
+\]
+
+We can code up a function that will compute the Satterthwaite correction for us. Note that there are similar functions scattered across different R packages (like ALSM) but they are designed for more complex/general problems.  
+```{r}
+# The function will need the two sample variances (s2x and s2y) and two sample sizes (Nx and Ny)
+satterthwaite <- function(s2x,s2y,Nx,Ny) {
+  se.x <- s2x/Nx # variance of mean X
+  se.y <- s2y/Ny # variance of mean Y
+  
+  # Compute the correction
+  df.cor <- (se.x + se.y)^2/(se.x^2/(Nx-1) + se.y^2/(Ny-1))
+  return(df.cor)
+}
+```
+
+We'll repeat the analysis of the number of siblings above, without the assumption of equality of variances.  When we drop this assumption the test becomes a *Welch's $t$-test*.  We'll do it by hand first, then using the t.test function.
+
+```{r}
+# Compute the new standard error, using the values already computed above
+se.new <- sqrt(var.older/N.older + var.young/N.young)
+
+# Compute t
+t.new <- (mean.older - mean.young)/se.new
+```
+
+Now apply the Satterthwaite correction to the degrees of freedom and compute the $p$-value.
+```{r}
+df.new <- satterthwaite(var.young,var.older,N.young,N.older)
+1 - pt(t.new,df.new)
+```
+
+This $p$-value is not much different from that obtained with the equal-variance assumption, because the sample sizes are relatively large.  We can now contrast this value to that obtained by the t.test function.  We need to make sure to set the options so that the conditions match those of the by-hand computations.
+
+```{r}
+t.test(siblings~young,alternative="greater",var.equal=FALSE)
+```
+
+Make sure to notice that the output of the satterthwaite function matches the degrees of freedom output of the t.test function (798.72).
+```{r}
+satterthwaite(var.young,var.older,N.young,N.older)
+```
+
+#### 5. Your turn!
+
+Using the same data as before, conduct a Welch's $t$-test by hand and then using the t.test function. If the final conclusion (reject or fail to reject $H_0$) is different from when you assumed equal variances, speculate on why this might have happened.
+
+```{r}
+# Insert your code here
+```
+
+## Dependent Samples
+
+Readings:
+
+1. Howell Chapter 7 (Section 7.4)
+2. Navarro [The paired-samples t-test](https://learningstatisticswithr.com/book/ttest.html#pairedsamplesttest)
+
+We worked through the two-sample $t$-tests by first embracing the equal variance assumption and then rejecting it.  Now we will reject the assumption of independence, and assume that the two groups are correlated, so high values in one group are associated with high values in the other group and vice versa.  Experimental designs that have correlated samples are called dependent designs.  
+
+A dependent design will have matched observations as in the following table.
+
+\begin{tabular}{lcc}
+    \hline
+    Observation & Treatment 1 & Treatment 2 \\
+    \hline
+    1          & $X_1$ & $Y_1$ \\
+    2          & $X_2$ & $Y_2$ \\
+    3          & $X_3$ & $Y_3$ \\
+    $\hdots$   \\
+    N          & $X_N$ & $Y_N$ \\
+    \hline
+    Mean       &  $\overline{X}$ &  $\overline{Y}$ \\
+\end{tabular}
+
+Observations are matched on the basis of a potentially confounding variable.  For example, Treatment 1 might be a novel teaching method and Treatment 2 the standard teaching method.  Because the person delivering the instruction might influence the students' performance, you might want to have the treatments paired by instructor.  So Observation 1 would consist of test scores for two students, each of whom experienced a different teaching method delivered by the same instructor.  
+
+If the treatments are administered to the same individual, as in a before vs. after intervention, then we call this a repeated measures design.  A repeated measures design is a special case of a dependent design.
+
+The GSS dataset has no dependent measures, so I am going to use R's anorexia dataset, which contains the pre- and post-treatment body weights of 72 people suffering from anorexia.
+
+```{r}
+data("anorexia")
+```
+This dataset includes the treatment type in the first column (anorexia$Treat), but we'll ignore that for now.  Collapsing all treatment types together, we can examine the pre- and post-weights in a box plot.
+```{r}
+boxplot(anorexia$Prewt,anorexia$Postwt,names=c("Before","After"),ylab="Body Weight")
+```
+
+You can see that, on the basis of a comparison between the means (the dark lines in the middle of the box), the effect of treatment looks very small.
+
+The null hypothesis will reflect failure: treatment did not help these patients gain weight.  The alternative is that treatment helped.  We will set up the hypotheses as
+\begin{eqnarray*}
+H_0: && \mu_{Pre} = \mu_{Post} \text{ and } \\
+H_1: && \mu_{Pre} < \mu_{Post}
+\end{eqnarray*}
+and test the null hypothesis using an $\alpha$-level of 0.05.
+
+Your initial impulse might be to pool the variance and estimate a common $\sigma^2$ as we did in the independent sample $t$-test.  However, the variance of the mean difference is very different when the two samples are correlated.  We can't write that $\sigma^2_{\overline{X} - \overline{Y}} = \sigma^2_{\overline{X}} + \sigma^2_{\overline{Y}}$.  Because the samples are correlated, 
+\[
+\sigma^2_{\overline{X} - \overline{Y}} = \sigma^2_{\overline{X}} + \sigma^2_{\overline{Y}} - 2~\rho~ \sigma_{\overline{X}}~\sigma_{\overline{Y}},
+\]
+where $\rho$ is the population correlation between the pre- and post-treatment body weights.  In dependent designs, $\rho$ is almost always greater than 0, which greatly reduces the standard error of the mean difference.  For the data we are working with now the sample correlation is
+```{r}
+cor(anorexia$Prewt,anorexia$Postwt)
+```
+
+It is not trivial to incorporate estimates of the two population variances and the population correlation into the estimate of the standard error.  There is an easier way to proceed that takes care of almost everything: Convert the pre- and post-treatment body weights into difference scores, then run a simple one-sample $t$-test on those scores. To see that this will recover the variance, run the following code chunk, which contrasts the variance of the difference scores with the variance of the differences computed using the equation above.
+
+```{r}
+diff <- anorexia$Postwt - anorexia$Prewt
+cat("The variance of the difference scores is ",var(diff),". \n")
+```
+
+Now consider the sum of the variances, and subtract off the term with the correlation coefficient.
+```{r}
+# Compute the variances
+var.pre <- var(anorexia$Prewt)
+var.post <- var(anorexia$Postwt)
+
+# Compute the correlation
+r <- cor(anorexia$Prewt,anorexia$Postwt)
+
+# Compute the variance of the differences
+var.diff <- var.pre + var.post - 2*r*sqrt(var.pre*var.post)
+
+cat("The sum of the variances is ",var.pre + var.post,'. \n')
+cat("The variance of the mean difference is ",var.diff,'. \n')
+``` 
+
+Thus, acknowledging the correlation reduces the estimated variance by approximately a third in this case, which in turn will increase the power of the test (which we'll discuss later).
+
+For the $t$-test, we will work exclusively with the difference scores in the context of a single sample test.
+```{r}
+# Compute the t-statistic
+N <- length(diff)
+t <- mean(diff)/(sd(diff)/sqrt(N))
+cat("The t-statistic is ",t,".\n")
+
+# Compute the p-value, using N-1 degrees of freedom
+p <- 1 - pt(t,N-1)
+cat("The p-value of this statistic is ",p,".\n")
+```
+
+Contrast these results to the results of the t.test function.
+```{r}
+t.test(diff,alternative="greater")
+```
+
+So we now see at least one of the benefits of a dependent sample design.  Even though the degrees of freedom are cut in half relative to an independent samples design, the reduction in the standard error that results from the correlation between the groups gives us a much more powerful test, and we are able to detect a very small effect.  We will discuss effect sizes in the next notebook, but we can compute it here as
+```{r}
+mean(diff)/sd(diff)
+```
+
+### 6. Your turn!
+
+Can you guess?  Select appropriate variables from your dataset and perform a dependent samples $t$-test.  If like me you have no dependent structures in your data, select one of the datasets (not anorexia) from the PairedData library or from elsewhere and use that one.  Articulate an interesting research question, set up the corresponding null and alternative hypotheses, and perform the t-test both by hand and with the t.test function.
+
+```{r}
+# Insert your code here
+```
+
+# APA Journal Article Reporting Standards (JARS)
+
+Reading: [The JARS Website](https://apastyle.apa.org/jars)
+
+We were unable to discuss this in class because of time limitations, but I include this here in case it is of future benefit to you.  The APA has very clear guidelines on the standards for reporting quantitative results especially in APA journals (e.g., *Psychological Review*, *Health Psychology*, *American Psychologist*, *Developmental Psychology*, etc.). 
+
+APA has published a ["cheat sheet"](https://apastyle.apa.org/jars/quant-table-1.pdf) to assist in the preparation and reporting of statistical findings.  Among the many standards listed there, the APA recommends reporting the research design and sample size, including computations of power and precision, and for statistics and data analysis, providing information about inferential statistics that includes, among other things:
+
+1. "results of all inferential tests conducted, including exact p values if null hypothesis significance testing (NHST) methods were used, and reporting the minimally sufficient set of statistics (e.g., dfs, mean square [MS] effect, MS error) needed to construct the tests, and
+2. effect-size estimates and confidence intervals on estimates that correspond to each inferential test conducted, when possible."
+
+The APA Publication Manual (7th edition) states:
+
+> Historically, researchers in psychology have relied heavily on null hypothesis significance testing (NHST) as a starting point for many of their analytic approaches. Different fields and publishers have different policies; APA, for example, stresses that NHST is but a starting point and that additional reporting elements such as effect sizes, confidence intervals, and extensive description are needed to convey the most complete meaning of the results (Wilkinson & the Task Force on Statistical Inference, 1999; see also APA, n.d.-b). The degree to which any journal emphasizes NHST is a decision of the individual editor. However, complete reporting of all tested hypotheses and estimates of appropriate effect sizes and confidence intervals are the minimum expectations for all APA journals. Researchers are always responsible for the accurate and responsible reporting of the results of their research study.
+
+An example paragraph from a recently published article in the *Journal of Experimental Psychology: General* reads:
+
+> The results in Experiment 1 revealed that participants were more likely to report the objects as the same identity when they appeared in the same spatiotopic or same retinotopic locations, compared to the control location (Figure 2A). Paired t tests revealed a significant spatiotopic SCB: difference in response bias for control versus same spatiotopic, t(15) = 3.6060, p = .0026, d = 0.9366, BF10 = 16.937, and a significant retinotopic SCB: control versus same retinotopic, t(15) = 2.6115, p = .0196, d = 0.6571, BF10 = 3.152, with no significant difference between spatiotopic and retinotopic biases, t(15) = -0.6686, p = .5139, d = 0.1822, BF10 = 0.311. This contrasts with the results from Shafer-Skelton et al. (2017), which only found a significant retinotopic SCB in the more static single saccade context. (Lu & Golomb, 2024)
+
+This paragraph refers to a mysterious "BF10" statistic, the Bayes Factor, which gives the odds in favor of the alternative hypothesis over the null.  This is a Bayesian statistic that I hope to be able to touch on at the end of the semester.
+
+# 7. Your turn!
+
+Answer the following questions.
+
+1. How is statistical *inference* different from statistical *description*?
+2. Why are null hypothesis tests the dominant method for reporting statistical results in psychology and a wide range of other disciplines?
+3. Think about what you've done in this notebook.
+    a. What was the most important thing you learned?
+    b. What was the hardest concept to understand?
+    c. What surprised you the most?
+4. How will you use null hypothesis tests in your own research?
+
+> 
+> Insert your responses here
+>
+
+
+
+
+

@@ -1,0 +1,53 @@
+---
+title: "ADD YOUR TITLE HERE"
+author: "YOUR NAME"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+editor_options: 
+  markdown: 
+    wrap: 80
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Attach the libraries used in this notebook
+
+
+```
+
+# Reading in Data
+
+This template reads in the GSS data described in the course notebook.  You should change this part as appropriate for your own data.
+
+```{r}
+data <- read.csv("GSS_1980.csv",header=TRUE)
+age <- data$age # Pull out age into its own variable to save typing later
+```
+
+# NOTEBOOK DESCRIPTION
+
+In this section of the notebook, you will outline what you did in this part of your data analysis.
+
+# YOUR TURN #1
+
+Throughout the module notebook there are sections entitled "YOUR TURN!"  In these sections you are asked to perform specific data analysis tasks.  Cut and paste any necessary information from the course notebook here.  Make sure to describe with adequate thoroughness what you are doing and comment your code as appropriate.  
+
+*Do not present long strings of uncommented code without description*.  Break up your work into digestible chunks, interspersing those chunks with descriptive text as appropriate.  Please see the course Rmd files for examples of reasonably well-described procedures and well-documented code.
+
+# YOUR TURN #2
+
+Etc.
+
+# SUMMARY
+
+Consider the learning objectives at the beginning of the appropriate course Rmd notebook.  Write a (very) short reflection of which of those learning objectives you feel that you mastered and which you believe you still need to practice.
+
+
+
+
+

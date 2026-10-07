@@ -6,12 +6,65 @@ N <- 30         # Sample size
 lambda <- 5     # Population mean
 conf <- .95     # Confidence level
 
+## Sample from an Exp(lambda) distribution
+#x <- matrix(rexp(30*10000,1/lambda),ncol=30)
+
+## Compute the means and standard errors for each sample
+#means <- rowMeans(x)
+#ses <- apply(x,1,sd)/sqrt(N) # Sample sd divided by sqrt(N)
+
+# An alternative:
+stats <- replicate(bignum, {
+  x <- rexp(N,rate=lambda)
+  c(X.bar=mean(x),s=sd(x))
+})
+### Confidence intervals
+# Draw 10000 samples of size 30 from an exponential distribution 
+# with mean 5 and compute the sample means
+bignum <- 10000 # Number of samples
+N <- 30         # Sample size
+lambda <- 5     # Population mean
+conf <- .95     # Confidence level
+
 # Sample from an Exp(lambda) distribution
-x <- matrix(rexp(30*10000,1/lambda),ncol=30)
+# x <- matrix(rexp(30*10000,1/lambda),ncol=30)
 
 # Compute the means and standard errors for each sample
-means <- rowMeans(x)
-ses <- apply(x,1,sd)/sqrt(N) # Sample sd divided by sqrt(N)
+# means <- rowMeans(x)
+# ses <- apply(x,1,sd)/sqrt(N) # Sample sd divided by sqrt(N)
+
+# An alternative:
+stats <- replicate(bignum, {
+  x <- rexp(N,rate=1/lambda)
+  c(X.bar=mean(x),s=sd(x))
+})
+means <- stats["X.bar",]
+ses <- stats["s",]/sqrt(N)
+
+head(means)
+head(ses)
+
+# Plot the sampling distribution of the means
+# hist(means,freq=FALSE,breaks=25,main="",xlab="Sample Means")
+
+# Variance known: sigma^2 = 25
+z.limits <- qnorm(c((1-conf)/2,1-(1-conf)/2))
+z.lower <- means + z.limits[1]*lambda/sqrt(N)
+z.upper <- means + z.limits[2]*lambda/sqrt(N)
+
+# Variance unknown: use s^2
+t.limits <- qt(c((1-conf)/2,1-(1-conf)/2),N-1)
+t.lower <- means + t.limits[1]*ses
+t.upper <- means + t.limits[2]*ses
+
+# Compute the probabilities that the z and t intervals 
+# contain lambda
+conf.z <- mean(lambda >= z.lower & lambda <= z.upper)
+conf.t <- mean(lambda >= t.lower & lambda <= t.upper)
+
+rbind(c("Confidence","Sigma known","Sigma unknown"),
+      c(0.95,round(conf.z,2),round(conf.t,2)))
+
 
 # Plot the sampling distribution of the means
 hist(means,freq=FALSE,breaks=25,main="",xlab="Sample Means")
@@ -101,7 +154,7 @@ arrows(x0=lower[c(1:15,137)],y0=y,x1=upper[c(1:15,137)],y1=y,
 mean(sigma^2 >= lower & sigma^2 <= upper)
 
 ### Confidence intervals for the GSS Age data
-install.packages("DescTools")
+# install.packages("DescTools")
 library("DescTools")
 
 data <- read.csv("GSS_1980.csv",header=TRUE)
@@ -111,7 +164,7 @@ N <- length(age)
 mean.age <- mean(age)
 sd.age <- sd(age)
 
-mean.limits <- mean.age + qt(c(.025,.975),N-1)*sd.age/N
+mean.limits <- mean.age + qt(c(.025,.975),N-1)*sd.age/sqrt(N)
 var.limits <- sd.age^2*(N-1)/qchisq(c(.975,.025),N-1)
 
 cat("Mean age = ",

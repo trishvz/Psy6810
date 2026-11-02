@@ -176,7 +176,7 @@ abline(v=.01,col='blue')
 # dev.off()
 #####################################
 # Sample size determination for z-test
-
+# pwrss does not have a z-test function that can do this
 alpha <- 0.01
 desired.power <- 0.95
 d <- 1.0 # effect size to be detected
@@ -199,6 +199,19 @@ abline(h=desired.power,lty=2)
 abline(v=c(N[first],N[first-1]),lty=3)
 axis(1,at=16,tick=TRUE)
 
+# Write a function to compute the n needed for a given power
+power.z.sample.size <- function(d,alpha,power,test='one.sided') {
+  if (test=='one.sided') {
+    z_alpha <- qnorm(1-alpha)
+  } else if (test=='two.sided') {
+    z_alpha <- qnorm(1-alpha/2)
+  }
+  z_power <- qnorm(power)
+  required_n <- ((z_alpha + z_power)/d)^2
+  return(ceiling(required_n))
+}
+
+
 #########################################
 # Sample size determination for two-sample t-test
 
@@ -208,4 +221,4 @@ d <- 0.5
 
 # pwrss
 power <- power.t.welch(d=d,alpha=alpha,alternative='one.sided',
-                       n.ratio=1,power=desired.power)
+                       power=desired.power)

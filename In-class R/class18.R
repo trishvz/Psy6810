@@ -89,7 +89,7 @@ d <- .10
 # Noncentrality parameter
 ncp <- d*sqrt(N)
 
-power.z.test(ncp=ncp,alpha=.05,alternative='one.sided')
+power.z.test(mean=ncp,alpha=.05,alternative='one.sided')
 
 
 #############################
@@ -142,6 +142,38 @@ ncp
 power.t.welch(d=d,var.ratio=s.2^2/s.1^2,n.ratio=N.2/N.1,
               n2=17,alpha=0.05,alternative='one.sided')
 
+######## Post-hoc power is a function of the p-value
+sim_out.1 <- replicate(n = 2000, expr = {
+  x1 <- rnorm(10, mean = 10, sd = 1)
+  x2 <- rnorm(10, mean = 10.1, sd = 1)
+  ttest.1 <- t.test(x1, x2, var.equal = TRUE)
+pwr.1 <- stats::power.t.test(delta = diff(ttest.1$estimate), 
+                      sd = sqrt((var(x1) + var(x2))/2), 
+                      sig.level = 0.05,
+                      n = 10)
+c(pvalue = ttest.1$p.value, obs_power = pwr.1$power)
+})
+
+sim_out.2 <- replicate(n = 2000, expr = {
+  x1 <- rnorm(10, mean = 10, sd = 1)
+  x2 <- rnorm(10, mean = 10.1, sd = 1)
+  ttest.2 <- t.test(x1, x2, var.equal = TRUE)
+pwr.2 <- stats::power.t.test(delta = diff(ttest.2$estimate), 
+                             sd = sqrt((var(x1) + var(x2))/2), 
+                             sig.level = 0.01,
+                             n = 10)
+c(pvalue = ttest.2$p.value, obs_power = pwr.2$power)
+})
+
+# png(filename='post-hoc-power.png',width=800,height=800)
+plot(t(sim_out.1),type='p',col='orange',
+     xlim = c(0,1), ylim = c(0,1), 
+     xlab = "p-value", ylab = "observed power",
+     main = "Two-sample t test simulation")
+abline(h=.5,v=.05,col=c('black','orange'))
+points(t(sim_out.2),pch=2,col='blue')
+abline(v=.01,col='blue')
+# dev.off()
 #####################################
 # Sample size determination for z-test
 
@@ -177,5 +209,3 @@ d <- 0.5
 # pwrss
 power <- power.t.welch(d=d,alpha=alpha,alternative='one.sided',
                        n.ratio=1,power=desired.power)
-
-

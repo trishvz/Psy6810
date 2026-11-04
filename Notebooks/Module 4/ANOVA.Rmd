@@ -2,12 +2,12 @@
 title: "Module 3 - ANOVA"
 author: "TVZ"
 output:
-  pdf_document:
-    toc: true
-    toc_depth: 3
   word_document:
     toc: true
     toc_depth: '3'
+  pdf_document:
+    toc: true
+    toc_depth: 3
   html_document:
     df_print: paged
     toc: true
@@ -37,8 +37,7 @@ library('pwr')
 #library('multcomp')
 ```
 
-This notebook is extra! Do what you can, if you can. Do what you find
-interesting. It should be useful for you as a reference while you work on your
+This should be useful for you as a reference while you work on your
 own analysis problems, most of which will involve some kind of ANOVA or
 regression.
 
@@ -626,10 +625,9 @@ mean. If $H_0$ is true, all the effects $\tau_j = 0$; "no effect of health."
 
 ### The Sampling Distributions of the Mean Squares
 
-Because $MS_{\text{Within}}$ and $MS_{\text{Between}}$ are sample
-statistics they have their own sampling distributions (which are
-related to $\chi^2$ distributions). The means of these distributions are given
-by $$
+Because $MS_{\text{Within}}$ and $MS_{\text{Between}}$ are sample statistics
+they have their own sampling distributions (which are related to $\chi^2$
+distributions). The means of these distributions are given by $$
 E[MS_{\text{Within}}] = \sigma^2_e,
 $$ and $$
 E[MS_{\text{Between}}] = \sigma^2_e + \dfrac{\sum_{j=1}^J N_j \tau_j^2}{J-1}.
@@ -638,8 +636,9 @@ $$
 If $H_0: \mu_1 = \cdots = \mu_J$ is true, all the $\tau_j$s equal 0, so we would
 expect that $$
 F = \dfrac{MS_{\text{Between}}}{MS_{\text{Within}}} \approx \dfrac{\sigma^2_e}{\sigma^2_e} = 1.
-$$
-If $H_0$ is false, at least one $\tau_j \neq 0$, so we would expect that the $F$ statistic will be significantly greater than one, because the squared effects, the squared $\tau_j$s, will make the numerator larger. 
+$$ If $H_0$ is false, at least one $\tau_j \neq 0$, so we would expect that the
+$F$ statistic will be significantly greater than one, because the squared
+effects, the squared $\tau_j$s, will make the numerator larger.
 
 ### Interpreting the Model Parameters
 
@@ -853,7 +852,8 @@ as the difference between the observed values $X_{ij}$ and the predicted values
 $\hat{X}_{ij} = \overline{X}_j$ from the model. Because $$
 X_{ij} = \hat{X}_{ij} + e_{ij},  
 $$ the *residual* $X_{ij} - \hat{X}_{ij} = e_{ij}$. It is the residuals (errors)
-that we examine for normality and homoskedasticity, because the model says that $e_{ij} \sim \mathcal{N}(0,\sigma^2_e)$.
+that we examine for normality and homoskedasticity, because the model says that
+$e_{ij} \sim \mathcal{N}(0,\sigma^2_e)$.
 
 A residual plot looks at the residuals $e_{ij}$ as a function of the predicted
 values $\hat{X}_{ij}$. These variables are returned as part of the `aov` model
@@ -866,9 +866,9 @@ plot(age.model$fitted.values,age.model$residuals,
 abline(h=0)
 ```
 
-Notice that there are only 4 fitted (or predicted) values, because (again) the ANOVA
-model says that an individual's measurement $X_{ij}$ is predicted by the mean of
-the group $\overline{X}_j$ to which that individual belongs:
+Notice that there are only 4 fitted (or predicted) values, because (again) the
+ANOVA model says that an individual's measurement $X_{ij}$ is predicted by the
+mean of the group $\overline{X}_j$ to which that individual belongs:
 $\hat{X}_{ij} = \overline{X}_j$. The horizontal line is placed at a residual
 value of 0.
 
@@ -905,8 +905,8 @@ qqline(age.model$residuals)
 
 The plot shows a good fit to the normal distribution everywhere except in the
 lower quantiles of residuals. We can get even more precise by doing a
-*Shapiro-Wilk test* of normality. This test focuses specifically on the deviations from the
-line shown in the QQ plot.
+*Shapiro-Wilk test* of normality. This test focuses specifically on the
+deviations from the line shown in the QQ plot.
 
 ```{r}
 shapiro.test(age.model$residuals)
@@ -991,7 +991,7 @@ $$
 
 The noncentrality parameter $\lambda$ for the non-central $F$ distribution is a
 function of Cohen's $f^2$: $$
-\lambda = f^2 \sum_{i=1}^k N_j.
+\lambda = f^2 \sum_{j=1}^k N_j.
 $$
 
 These are a lot of little formulas, and I present them so you know how to use
@@ -1001,13 +1001,13 @@ Like the Cohen's $d$ we encountered in tests of two means, there are guidelines
 for what we consider to be small, medium, or large effect sizes for $\eta^2$,
 $\omega^2$ and $f^2$:
 
-| Size           | $\eta^2,\omega^2$   |    | f    |
-|:---------------|:-------------------:|--- |:----:|
-|----------------|---------------------|    |------|
-| Small effect   | 0.01                |    | 0.10 |
-| Medium effect  | 0.06                |    | 0.25 |
-| Large effect   | 0.14                |    | 0.40 |
-|----------------|---------------------|    |------|
+| Size             |   $\eta^2,\omega^2$   |     |   f    |
+|:-----------------|:---------------------:|-----|:------:|
+| ---------------- | --------------------- |     | ------ |
+| Small effect     |         0.01          |     |  0.10  |
+| Medium effect    |         0.06          |     |  0.25  |
+| Large effect     |         0.14          |     |  0.40  |
+| ---------------- | --------------------- |     | ------ |
 
 These effects are easy to compute using commands from `R`'s `effectsize`
 package. Here is some code to compute $\eta^2$, $\omega^2$ and Cohen's $f$.
@@ -1172,8 +1172,8 @@ conservative than the Dunn-Šidák procedure: it will be slightly harder to reje
 the $H_0s$ using Bonferroni but the per-comparison $\alpha$-level is easier to
 compute.
 
-One important thing to know about pairwise $t$-tests is how the standard error of
-the mean difference is computed. Remember for independent t-tests this is $$
+One important thing to know about pairwise $t$-tests is how the standard error
+of the mean difference is computed. Remember for independent t-tests this is $$
 s_{\overline{X} - \overline{Y}} = s_P \sqrt{\dfrac{1}{N_X} + \dfrac{1}{N_Y}}
 $$ and $$
 s_P^2 = \dfrac{(N_X-1) s_X^2 + (N_Y-1) s_Y^2}{N_X + N_Y - 2}.
@@ -1258,11 +1258,11 @@ observations per group (assuming equal group sizes). The statistic $q$ follows a
 Studentized range distribution with parameters $J$ (the number of groups) and
 $\nu = N_{\text{Total}}-J$ (the degrees of freedom for $MS_{\text{Within}}$).
 
-The distribution of $q$ has root `tukey` in R, but the density function
-`dtukey` is not defined because it has no closed form. Only the quantile and
-probability functions `qtukey` and `ptukey` are defined. There is a plot of 4
-Studentized range distributions (for $k=3,6$ and $n=4,15$) in the lecture notes.
-A simulation of the $J=6,~n=15$ case is given in this code chunk. You can play
+The distribution of $q$ has root `tukey` in R, but the density function `dtukey`
+is not defined because it has no closed form. Only the quantile and probability
+functions `qtukey` and `ptukey` are defined. There is a plot of 4 Studentized
+range distributions (for $k=3,6$ and $n=4,15$) in the lecture notes. A
+simulation of the $J=6,~n=15$ case is given in this code chunk. You can play
 around with $J$ and $n$ to see how these affect the shape of the distribution.
 
 ```{r}
@@ -1298,9 +1298,8 @@ qtukey(1-alpha,J,J*n-J)
 
 The HSD is the (absolute) mean difference
 $\left| \overline{X}_{\max} - \overline{X}_{\min} \right|$ that makes the $q$
-statistic greater than the critical value $q(1-\alpha,J,\nu)$. Rearrange
-the equation for $q$ to solve for the significant mean difference:
-\begin{eqnarray*}
+statistic greater than the critical value $q(1-\alpha,J,\nu)$. Rearrange the
+equation for $q$ to solve for the significant mean difference: \begin{eqnarray*}
 q(1-\alpha,J,\nu)  & = & HSD/\sqrt{MS_{\text{Within}}/n} \\
 & \rightarrow & HSD = q(1-\alpha,J,\nu)\sqrt{MS_{\text{Within}}/n}.
 \end{eqnarray*}
@@ -1399,7 +1398,7 @@ compute the observed value of the contrast, which is $$
 \hat{\Psi} = \sum_{j=1}^J c_j \overline{X}_j.
 $$ Then we need to compute the sum of squares for the contrast $\Psi$, which
 should equal $MS_{\text{Within}}$ approximately if $\Psi=0$. The sum of squares
-for $\Psi$ is given by $SS_{\Psi} = \hat{\Psi}/w$, where
+for $\Psi$ is given by $SS_{\Psi} = \hat{\Psi^2}/w$, where
 $w = \sum_{j=1}^J c_j^2/N_j$. This sum of squares has only 1 degree of freedom,
 so $MS_{\Psi} = SS_{\Psi}$.
 
@@ -1823,11 +1822,14 @@ people.
 
 Let's fit the ANOVA model and look for these sums of squares in the output. For
 the `aov` function, we specify two independent variables by expanding the model
-formula from `age.sub ~ health.sub` to `age.sub ~ health.sub + happy.sub + health.sub:happy.sub`, where
-happy is the second independent variable and `health.sub:happy.sub` indicates an
-interaction between health and happy. The `+` signs indicate that we are
-including main effects for both health and happy, while the `:` indicates that
-we are including an interaction effect between health and happy.  An equivalent formula is `age.sub~health.sub*happy.sub`, which includes main effects and the interaction explicitly.
+formula from `age.sub ~ health.sub` to
+`age.sub ~ health.sub + happy.sub + health.sub:happy.sub`, where happy is the
+second independent variable and `health.sub:happy.sub` indicates an interaction
+between health and happy. The `+` signs indicate that we are including main
+effects for both health and happy, while the `:` indicates that we are including
+an interaction effect between health and happy. An equivalent formula is
+`age.sub~health.sub*happy.sub`, which includes main effects and the interaction
+explicitly.
 
 ```{r}
 # Fit the two-way ANOVA model
@@ -1844,7 +1846,7 @@ sums of squares for the main effects, interaction, and error
 factors $J$ and $K$, respectively, then the degrees of freedom for each main
 effect is $df_J = J-1$ and $df_K = K-1$. The degrees of freedom for the
 interaction effect is $df_{J \times K} = (J-1)(K-1)$. The degrees of freedom for
-the within groups variance is $df_{\text{Within}} = N_{\text{Total}} - JK$; 
+the within groups variance is $df_{\text{Within}} = N_{\text{Total}} - JK$;
 think about this one as you did for the one-way ANOVA where you subtracted off
 the number of levels, but now you're subtracting off the number of cells. The
 sum of the main effects and interaction degrees of freedom should equal the
@@ -1932,7 +1934,9 @@ passed to `aov`. This is because the sums of squares for each source can no
 longer be perfectly partitioned: there will be some influence of factor $J$ in
 the main effect of $K$ and vice versa.
 
-Go back to the full GSS_1980 dataset.  Fit the factorial ANOVA model in two ways, with health first and then with happy first.
+Go back to the full GSS_1980 dataset. Fit the factorial ANOVA model in two ways,
+with health first and then with happy first.
+
 ```{r}
 # Fit the two-way ANOVA model with health entered first
 summary(aov(age~health+happy+health:happy))
@@ -1971,15 +1975,29 @@ age.Anova <- lm(age~health+happy+happy:health)
 Anova(age.Anova,type="III")
 ```
 
-Only the main effect of `happy` is significant at an $\alpha=0.05$ level.  But wait...
+Only the main effect of `happy` is significant at an $\alpha=0.05$ level. But
+wait...
 
 ### How Many Tests?
 
-You probably wondered about doing three $F$-tests and the Type I error inflation problem we talked about earlier in the context of pairwise $t$-tests.  Good for you!
+You probably wondered about doing three $F$-tests and the Type I error inflation
+problem we talked about earlier in the context of pairwise $t$-tests. Good for
+you!
 
-Yes, [you should correct your alpha level to accommodate 3 tests](https://link.springer.com/article/10.3758/s13423-015-0913-5).  Be aware that people will argue with you about this.  The conservative and statistically "pure" approach would be to reduce the per-comparison alpha level according to something like the Bonferroni or Dunn-Šidák correction.  Common practice, however, is to argue that the ANOVA model you just fit is a single test, the sums of squares are independent from each other (if the group sizes are equal), and performing a correction is "too conservative."  
+Yes, [you should correct your alpha level to accommodate 3
+tests](https://link.springer.com/article/10.3758/s13423-015-0913-5). Be aware
+that people will argue with you about this. The conservative and statistically
+"pure" approach would be to reduce the per-comparison alpha level according to
+something like the Bonferroni or Dunn-Šidák correction. Common practice,
+however, is to argue that the ANOVA model you just fit is a single test, the
+sums of squares are independent from each other (if the group sizes are equal),
+and performing a correction is "too conservative."
 
-If you use a Bonferroni correction for the alpha-level in the ANOVA you just performed, $\alpha_{PC} = 0.05/3 = 0.0167.$  In this case, there are no significant main effects of or interactions between health and happy on respondent age in the full data set.  In the subsetted (balanced) dataset the main effect of happy is still significant after the correction.
+If you use a Bonferroni correction for the alpha-level in the ANOVA you just
+performed, $\alpha_{PC} = 0.05/3 = 0.0167.$ In this case, there are no
+significant main effects of or interactions between health and happy on
+respondent age in the full data set. In the subsetted (balanced) dataset the
+main effect of happy is still significant after the correction.
 
 ### 12. Your turn!
 
@@ -2020,12 +2038,14 @@ times <- as.factor(rep(c(500,1000,1500),times=5))
 ```
 
 For repeated measures designs, the participant factor is treated like an
-independent variable, but we say that the time factor is "nested" within it. (Variables like "participant" are called *random effects*, and models that include both fixed factors (like times) and random effects (like participant) are called mixed-effects models.)  The
-way that the sums of squares are partitioned is determined by the formula passed
-to `aov` (or `Anova`). The big difference between a one-way ANOVA and a
-(one-way) repeated measures ANOVA is that for the repeated measures ANOVA we
-have to tell `aov` what the error term ($MS_{\text{Error}}$) is. It isn't
-$MS_{\text{Within}}$ any more.
+independent variable, but we say that the time factor is "nested" within it.
+(Variables like "participant" are called *random effects*, and models that
+include both fixed factors (like times) and random effects (like participant)
+are called mixed-effects models.) The way that the sums of squares are
+partitioned is determined by the formula passed to `aov` (or `Anova`). The big
+difference between a one-way ANOVA and a (one-way) repeated measures ANOVA is
+that for the repeated measures ANOVA we have to tell `aov` what the error term
+($MS_{\text{Error}}$) is. It isn't $MS_{\text{Within}}$ any more.
 
 ```{r}
 summary(aov(memory~times+Error(participant/times)))
@@ -2048,9 +2068,9 @@ results.
 
 Think about what you've done in this notebook.
 
-a. What was the most important thing you learned?
-b. What was the hardest concept to understand?
-c. What surprised you the most?
+a.  What was the most important thing you learned?
+b.  What was the hardest concept to understand?
+c.  What surprised you the most?
 
 > Insert your responses here
 

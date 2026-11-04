@@ -16,6 +16,8 @@ urlcolor: blue
 editor_options:
   markdown:
     wrap: 80
+header-includes:
+  - \DeclareUnicodeCharacter{2500}{-}    
 ---
 
 ```{r setup, include=FALSE}
